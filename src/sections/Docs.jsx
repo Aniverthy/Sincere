@@ -1,3 +1,5 @@
+import Reveal from '../components/Reveal.jsx'
+
 const DOCS = [
   {
     file: 'README.md',
@@ -32,19 +34,25 @@ export default function Docs() {
   return (
     <section id="docs" className="tint">
       <div className="wrap">
-        <p className="kicker">For the curious</p>
-        <h2>Read the full documentation</h2>
-        <p className="lede">
-          Sincère is designed in the open inside this repository. The complete documentation suite
-          lives alongside this page.
-        </p>
+        <Reveal>
+          <h2>Documentation</h2>
+          <p className="lede">
+            The complete documentation suite lives alongside this page — product, engineering,
+            architecture, and go-to-market.
+          </p>
+        </Reveal>
         <div className="grid">
-          {DOCS.map((d) => (
-            <a key={d.file} className="card doc-card" href={`./${d.file}`}>
-              <span className="doc-file">{d.file}</span>
-              <h3>{d.title}</h3>
-              <p>{d.blurb}</p>
-            </a>
+          {DOCS.map((d, i) => (
+            <Reveal key={d.file} delay={(i % 3) * 90}>
+              <a className="card doc-card" href={`./${d.file}`}>
+                <span className="doc-file">{d.file}</span>
+                <h3>{d.title}</h3>
+                <p>{d.blurb}</p>
+                <span className="doc-arrow" aria-hidden="true">
+                  →
+                </span>
+              </a>
+            </Reveal>
           ))}
         </div>
       </div>
