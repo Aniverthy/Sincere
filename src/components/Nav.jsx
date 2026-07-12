@@ -36,9 +36,6 @@ export default function Nav() {
               {label}
             </a>
           ))}
-          <a href="#docs" className="btn btn-small" onClick={() => setOpen(false)}>
-            Read the docs
-          </a>
         </div>
         <button
           className="nav-burger"

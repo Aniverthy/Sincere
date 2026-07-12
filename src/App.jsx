@@ -6,7 +6,6 @@ import HowItWorks from './sections/HowItWorks.jsx'
 import Features from './sections/Features.jsx'
 import Fairness from './sections/Fairness.jsx'
 import Roadmap from './sections/Roadmap.jsx'
-import Docs from './sections/Docs.jsx'
 
 export default function App() {
   return (
@@ -20,7 +19,6 @@ export default function App() {
         <Features />
         <Fairness />
         <Roadmap />
-        <Docs />
       </main>
       <footer className="footer">
         <div className="wrap footer-inner">

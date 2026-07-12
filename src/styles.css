@@ -917,29 +917,6 @@ h3 { font-size: 1.08rem; font-weight: 600; letter-spacing: -0.01em; }
 .tl-body h3 { margin-bottom: 0.35rem; }
 .tl-body p { color: var(--ink-soft); font-size: 0.95rem; max-width: 44rem; }
 
-/* ---------- docs ---------- */
-.doc-card { display: block; text-decoration: none; color: inherit; padding-right: 2.6rem; }
-
-.doc-file {
-  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
-  font-size: 0.74rem;
-  color: var(--peach);
-  margin-bottom: 0.6rem;
-  display: block;
-  overflow-wrap: anywhere;
-}
-
-.doc-arrow {
-  position: absolute;
-  right: 1.4rem;
-  top: 1.4rem;
-  font-size: 1.15rem;
-  color: var(--ink-soft);
-  transition: transform 0.25s ease, color 0.25s ease;
-}
-
-.doc-card:hover .doc-arrow { transform: translate(4px, -4px); color: var(--rose); }
-
 /* ---------- footer ---------- */
 .footer { border-top: 1px solid var(--line); padding: 2.6rem 1.5rem; background: var(--bg-2); }
 

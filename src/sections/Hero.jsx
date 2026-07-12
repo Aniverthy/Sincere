@@ -29,8 +29,8 @@ export default function Hero() {
                 <path d="M5 12h14M13 6l6 6-6 6" />
               </svg>
             </a>
-            <a className="btn btn-ghost" href="#docs">
-              Read the docs
+            <a className="btn btn-ghost" href="#fairness">
+              See the fairness rules
             </a>
           </div>
           <div className="hero-proof">
