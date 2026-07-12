@@ -1,0 +1,13 @@
+# Placeholder - pin versions when development starts.
+# Core (assumed stack, see README.md section 4):
+# fastapi
+# uvicorn[standard]
+# motor              # async MongoDB driver
+# celery[redis]
+# redis
+# pydantic-settings
+# pyjwt
+# h3                 # Uber H3 spatial index (resolution 6)
+# deepface           # FaceNet wrapper for embeddings
+# xgboost | lightgbm # reciprocity model
+# implicit           # ALS collaborative filtering

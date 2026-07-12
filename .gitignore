@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# ML artifacts
+ml/registry/*.bin
+ml/registry/*.pkl
+
+# Editor/OS
+.DS_Store
+.idea/
+.vscode/
+
+# Node (website branch leftovers in local working tree)
+node_modules/
+dist/
