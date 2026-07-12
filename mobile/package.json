@@ -1,0 +1,9 @@
+{
+  "name": "sincere-mobile",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Sincere mobile app (React Native) - structural placeholder; run the RN toolchain init before development starts.",
+  "scripts": {},
+  "dependencies": {},
+  "devDependencies": {}
+}
