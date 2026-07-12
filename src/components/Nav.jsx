@@ -6,17 +6,52 @@ const LINKS = [
   ['#features', 'Trust'],
   ['#fairness', 'Fairness'],
   ['#roadmap', 'Roadmap'],
+  ['#about-user', 'About User'],
 ]
 
 export default function Nav() {
   const [scrolled, setScrolled] = useState(false)
+  const [activeSection, setActiveSection] = useState('')
+  const [scrollPercent, setScrollPercent] = useState(0)
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24)
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
+    const handleScroll = () => {
+      const scrollPos = window.scrollY
+      setScrolled(scrollPos > 24)
+
+      // Calculate scroll progress percentage (flow bar)
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight
+      if (docHeight > 0) {
+        setScrollPercent((scrollPos / docHeight) * 100)
+      }
+
+      // Determine which section is currently active
+      const sectionIds = ['problem', 'how', 'features', 'fairness', 'roadmap', 'about-user']
+      let currentSection = ''
+
+      // Check if we are close to the bottom of the page
+      if (window.innerHeight + scrollPos >= document.documentElement.scrollHeight - 80) {
+        currentSection = '#about-user'
+      } else {
+        // Find which section is currently crossing the viewport threshold
+        for (const id of sectionIds) {
+          const el = document.getElementById(id)
+          if (el) {
+            const rect = el.getBoundingClientRect()
+            if (rect.top <= 160 && rect.bottom >= 160) {
+              currentSection = `#${id}`
+              break
+            }
+          }
+        }
+      }
+      setActiveSection(currentSection)
+    }
+
+    handleScroll()
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
   return (
@@ -32,7 +67,12 @@ export default function Nav() {
         </a>
         <div className={`nav-links ${open ? 'nav-links--open' : ''}`}>
           {LINKS.map(([href, label]) => (
-            <a key={href} href={href} onClick={() => setOpen(false)}>
+            <a
+              key={href}
+              href={href}
+              className={activeSection === href ? 'active' : ''}
+              onClick={() => setOpen(false)}
+            >
               {label}
             </a>
           ))}
@@ -48,6 +88,7 @@ export default function Nav() {
           <span />
         </button>
       </div>
+      <div className="nav-flow-bar" style={{ width: `${scrollPercent}%` }} />
     </nav>
   )
 }
