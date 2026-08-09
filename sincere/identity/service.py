@@ -427,8 +427,23 @@ async def submit_liveness(
 
     assessment = risk.score(signals, thresholds)
 
-    # §9 forces review when the gate is closed — there is no automated evidence to approve on.
-    band = assessment.band if settings.biometric_pipeline_enabled else RiskBand.REVIEW
+    if settings.biometric_pipeline_enabled:
+        band = assessment.band
+    elif settings.dev_auto_approve_verification:
+        # Development only — the Settings validator refuses this flag in production, so this
+        # branch cannot exist in a real deployment. Without it the app is untestable
+        # end-to-end, because every signup queues behind a manual approval.
+        band = RiskBand.AUTO_APPROVE
+        liveness_result["dev_auto_approved"] = True
+        logger.warning(
+            "identity.dev_auto_approved — verification bypassed by "
+            "DEV_AUTO_APPROVE_VERIFICATION. Never set this outside development.",
+            extra={"user_id": user_id},
+        )
+    else:
+        # §9 forces review when the gate is closed — there is no automated evidence on which
+        # to approve, and letting unverified accounts through would defeat the product.
+        band = RiskBand.REVIEW
 
     await repo.store_capture(
         user_id=user_id,

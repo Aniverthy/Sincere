@@ -75,6 +75,18 @@ class Settings(BaseSettings):
     face pipeline may ship. Defaults off; enabling it in production is a deliberate act.
     With this off, signup routes to human review instead of running embeddings."""
 
+    dev_auto_approve_verification: bool = False
+    """Skip the human review queue during development.
+
+    With ``biometric_pipeline_enabled`` false (the §9:484 legal gate), every signup correctly
+    routes to human review — which makes the app untestable end-to-end without an operator
+    approving each account by hand.
+
+    This flag short-circuits that **in development only**. The validator below refuses to let
+    it load in production, so it cannot become an accidental route around FR-1.6: a real
+    deployment either runs the biometric pipeline or queues for a human, never neither.
+    """
+
     wemet_enabled: bool = True
     """FR-4.3 — We-Met rolls out shortly post-MVP. Built now, gated for launch timing."""
 
@@ -120,6 +132,11 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "production requires a MongoDB Atlas connection string "
                     "(mongodb+srv://) — §9 duplicate detection depends on Atlas Vector Search"
+                )
+            if self.dev_auto_approve_verification:
+                raise ValueError(
+                    "DEV_AUTO_APPROVE_VERIFICATION cannot be enabled in production — it would "
+                    "admit accounts with no verification at all, bypassing FR-1.6 entirely"
                 )
         return self
 

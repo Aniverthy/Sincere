@@ -162,6 +162,31 @@ class TestProductionGuards:
         )
         assert settings.environment == "production"
 
+    def test_dev_auto_approve_rejected_in_production(self) -> None:
+        """The dev bypass must be impossible to ship.
+
+        It skips FR-1.6 routing entirely, so with the §9:484 biometric gate also closed a
+        production deployment carrying this flag would admit accounts with **no verification
+        of any kind**. Refusing at load time means the process cannot start rather than
+        starting in that state.
+        """
+        from sincere.shared.config import Settings
+
+        with pytest.raises(ValidationError, match="DEV_AUTO_APPROVE_VERIFICATION"):
+            Settings(
+                environment="production",
+                jwt_secret="Yb3F" * 12,
+                mongodb_uri="mongodb+srv://cluster/sincere",
+                dev_auto_approve_verification=True,
+            )
+
+    @pytest.mark.parametrize("environment", ["dev", "test", "staging"])
+    def test_dev_auto_approve_allowed_outside_production(self, environment: str) -> None:
+        from sincere.shared.config import Settings
+
+        settings = Settings(environment=environment, dev_auto_approve_verification=True)
+        assert settings.dev_auto_approve_verification is True
+
     def test_non_atlas_uri_rejected_in_production(self) -> None:
         """§9 duplicate detection (FR-1.4) requires Atlas Vector Search — a plain
         mongodb:// URI in production means duplicate detection silently does not run."""

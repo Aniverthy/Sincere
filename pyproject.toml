@@ -33,6 +33,9 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101"]
+# Developer CLI tools: printing to the terminal is the whole point, and §22's structured-
+# logging rule is about the application's log store, not an operator's console.
+"scripts/*" = ["T201"]
 
 # ---------------------------------------------------------------------------
 # Types

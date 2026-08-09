@@ -17,6 +17,22 @@ os.environ.setdefault("ENVIRONMENT", "test")
 os.environ.setdefault("JWT_SECRET", "test-secret-not-used-in-any-real-deployment")
 
 
+def pytest_configure() -> None:
+    """Stop the test suite reading the developer's local ``.env``.
+
+    ``Settings`` and ``Thresholds`` load ``.env`` by default, which means a value someone set
+    for their own machine — a dev-only feature flag, a different threshold — silently changes
+    what the tests assert. That already bit once: enabling DEV_AUTO_APPROVE_VERIFICATION
+    locally broke an unrelated production-guard test.
+
+    Tests should depend only on documented defaults and what they pass explicitly.
+    """
+    from sincere.shared.config import Settings, Thresholds
+
+    for model in (Settings, Thresholds):
+        model.model_config["env_file"] = None
+
+
 @pytest.fixture(autouse=True)
 def _reset_settings_cache() -> Iterator[None]:
     """Settings and thresholds are LRU-cached for the process lifetime; tests that tweak
