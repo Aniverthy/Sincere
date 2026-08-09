@@ -8,3 +8,10 @@ android/.gradle/
 dist/
 *.log
 .DS_Store
+
+# Expo
+node_modules/
+.expo/
+.expo-export-test/
+dist/
+*.log

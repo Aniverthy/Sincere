@@ -1,0 +1,64 @@
+{
+  "expo": {
+    "name": "Sincère",
+    "slug": "sincere",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "sincere",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.sincere.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Sincère uses your camera once, for the liveness check that verifies you are a real person. The video is deleted after verification.",
+        "NSMicrophoneUsageDescription": "The liveness check records a short video with audio.",
+        "NSPhotoLibraryUsageDescription": "Choose photos for your profile.",
+        "NSLocationWhenInUseUsageDescription": "Sincère reads your location only while the app is open, to find matches within your chosen radius. We never track you in the background and keep no location history."
+      }
+    },
+    "android": {
+      "package": "app.sincere.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#1A1423",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "blockedPermissions": [
+        "android.permission.ACCESS_BACKGROUND_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Sincère uses your camera once, for the liveness check that verifies you are a real person.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Sincère reads your location only while the app is open.",
+          "isAndroidBackgroundLocationEnabled": false
+        }
+      ],
+      "expo-secure-store",
+      "expo-web-browser"
+    ],
+    "extra": {
+      "apiBaseUrl": "http://localhost:8000/v1"
+    }
+  }
+}
