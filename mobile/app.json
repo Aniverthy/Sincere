@@ -55,7 +55,8 @@
         }
       ],
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-font"
     ],
     "extra": {
       "apiBaseUrl": "http://localhost:8000/v1"

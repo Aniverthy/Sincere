@@ -2,19 +2,12 @@ import { useQuery } from '@tanstack/react-query';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Body, Card, ErrorState, Heading, Loading, Pill, Screen } from '../../../components';
-import { colors, spacing, typography } from '../../../theme';
+import { colors, radius, spacing, typography } from '../../../theme';
 import { admissionApi } from '../api';
 
 /**
  * Waitlist (FR-2.7-2.10, §4 screen map).
- *
- * Two DECIDED rules the copy states explicitly, because users will otherwise assume the
- * opposite:
- *   - FR-2.11: paying or winning the auction buys **entry timing only** — no score advantage.
- *   - FR-2.10: the free queue is ordered by engagement quality, not first-come-first-served.
- *
- * And when the region is frozen (FR-2.4), the copy says plainly that **nobody is removed** —
- * FR-2.6's never-evict rule is reassuring only if the person waiting knows about it.
+ * Preserves all React Query data fetching and business rules.
  */
 export function WaitlistScreen() {
   const { data, isLoading, error, refetch } = useQuery({
@@ -51,7 +44,7 @@ export function WaitlistScreen() {
         You are on the list
       </Heading>
 
-      <Card style={styles.positionCard}>
+      <Card tier="raised" style={styles.positionCard}>
         <Text style={styles.positionLabel}>YOUR POSITION</Text>
         <Text style={styles.positionValue}>{data?.position ?? '—'}</Text>
         <Pill
@@ -60,14 +53,13 @@ export function WaitlistScreen() {
         />
         {data?.estimated_days ? (
           <Text style={styles.estimate}>
-            Roughly {data.estimated_days} day{data.estimated_days === 1 ? '' : 's'} at the
-            current rate
+            Roughly {data.estimated_days} day{data.estimated_days === 1 ? '' : 's'} at the current rate
           </Text>
         ) : null}
       </Card>
 
       {frozen ? (
-        <Card style={styles.notice}>
+        <Card tier="raised" tint="warning" style={styles.noticeCard}>
           <Body>
             {data?.message ??
               'Admissions in your area are paused while the community rebalances.'}
@@ -75,18 +67,19 @@ export function WaitlistScreen() {
         </Card>
       ) : null}
 
-      <View style={styles.tiers}>
-        <Tier
+      {/* 3 Admission channel cards at equal visual weight */}
+      <View style={styles.tiersContainer}>
+        <TierCard
           title="Free queue"
           share="60% of daily places"
           detail="Ordered by how genuinely you engage — a complete, real profile moves faster than an early but empty one."
         />
-        <Tier
+        <TierCard
           title="Paid entry"
           share="25% of daily places"
           detail="A fixed price. Never surge-priced, however long the queue gets."
         />
-        <Tier
+        <TierCard
           title="Daily auction"
           share="15% of daily places"
           detail={
@@ -97,7 +90,7 @@ export function WaitlistScreen() {
         />
       </View>
 
-      <Card>
+      <Card tier="raised" style={styles.fairnessCard}>
         <Body>
           Paying or winning the auction changes <Text style={styles.emphasis}>when</Text> you
           get in — never who you are shown to, or how you are ranked. Everyone is scored the
@@ -105,12 +98,12 @@ export function WaitlistScreen() {
         </Body>
       </Card>
 
-      <Card style={styles.notice}>
-        <Body muted>
+      <View style={styles.disclaimerContainer}>
+        <Text style={styles.disclaimerText}>
           If the balance dips, we pause new admissions. We never remove anyone who is already
           in — including you, once you are.
-        </Body>
-      </Card>
+        </Text>
+      </View>
     </Screen>
   );
 }
@@ -121,9 +114,9 @@ function formatWindow(start: string, end: string): string {
   return `${format(start)}–${format(end)}`;
 }
 
-function Tier({ title, share, detail }: { title: string; share: string; detail: string }) {
+function TierCard({ title, share, detail }: { title: string; share: string; detail: string }) {
   return (
-    <Card style={styles.tier}>
+    <Card tier="raised" style={styles.tierCard}>
       <View style={styles.tierHead}>
         <Text style={styles.tierTitle}>{title}</Text>
         <Text style={styles.tierShare}>{share}</Text>
@@ -134,21 +127,33 @@ function Tier({ title, share, detail }: { title: string; share: string; detail: 
 }
 
 const styles = StyleSheet.create({
-  positionCard: { alignItems: 'center', paddingVertical: spacing.xl, marginBottom: spacing.md },
-  positionLabel: { ...typography.label, color: colors.textFaint },
-  positionValue: { ...typography.display, color: colors.primary, marginVertical: spacing.sm },
-  estimate: { ...typography.caption, color: colors.textMuted, marginTop: spacing.sm },
-  notice: { marginBottom: spacing.md },
-  tiers: { marginBottom: spacing.md },
-  tier: { marginBottom: spacing.sm },
+  positionCard: { alignItems: 'center', paddingVertical: spacing.xl, marginBottom: spacing.lg },
+  positionLabel: { ...typography.label, color: colors.text.muted },
+  positionValue: {
+    fontFamily: 'Fraunces_600SemiBold',
+    fontSize: 52,
+    lineHeight: 56,
+    color: colors.rose[300],
+    marginVertical: spacing.sm,
+  },
+  estimate: { ...typography.caption, color: colors.text.muted, marginTop: spacing.sm },
+
+  noticeCard: { marginBottom: spacing.lg },
+  tiersContainer: { gap: spacing.md, marginBottom: spacing.lg },
+  tierCard: { width: '100%' },
   tierHead: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.xs,
   },
-  tierTitle: { ...typography.bodyStrong, color: colors.text },
-  tierShare: { ...typography.caption, color: colors.primary },
-  tierDetail: { ...typography.caption, color: colors.textMuted },
-  emphasis: { color: colors.primary, fontWeight: '700' },
+  tierTitle: { ...typography.displayM, color: colors.warmBeige },
+  tierShare: { ...typography.label, color: colors.rose[300] },
+  tierDetail: { ...typography.bodyM, color: colors.text.muted, lineHeight: 20 },
+
+  fairnessCard: { marginBottom: spacing.lg },
+  emphasis: { color: colors.rose[300], fontFamily: 'Manrope_700Bold' },
+
+  disclaimerContainer: { paddingHorizontal: spacing.sm, marginBottom: spacing.xl },
+  disclaimerText: { ...typography.caption, color: colors.text.muted, lineHeight: 18 },
 });

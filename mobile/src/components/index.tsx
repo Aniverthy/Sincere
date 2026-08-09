@@ -1,19 +1,28 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
   type StyleProp,
+  type TextInputProps,
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 
+import { GlassSurface, type GlassTier, type GlassTint } from './GlassSurface';
+import { Logo } from './Logo';
 import { colors, radius, spacing, typography } from '../theme';
 
-/** Screen chrome: safe area + background, so no screen repeats it. */
+export { GlassSurface, Logo };
+
+/** Screen chrome: safe area + Liquid Glass gradient background. */
 export function Screen({
   children,
   scroll = false,
@@ -27,6 +36,7 @@ export function Screen({
     <ScrollView
       contentContainerStyle={[styles.scrollContent, style]}
       keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
     >
       {children}
     </ScrollView>
@@ -34,7 +44,17 @@ export function Screen({
     <View style={[styles.screenBody, style]}>{children}</View>
   );
 
-  return <SafeAreaView style={styles.screen}>{content}</SafeAreaView>;
+  return (
+    <View style={styles.screenWrapper}>
+      <LinearGradient
+        colors={[colors.bg.wine, colors.bg.roseDusk, colors.bg.wine]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <SafeAreaView style={styles.screen}>{content}</SafeAreaView>
+    </View>
+  );
 }
 
 export function Heading({ children, sub }: { children: ReactNode; sub?: string }) {
@@ -46,8 +66,16 @@ export function Heading({ children, sub }: { children: ReactNode; sub?: string }
   );
 }
 
-export function Body({ children, muted = false }: { children: ReactNode; muted?: boolean }) {
-  return <Text style={[styles.body, muted && styles.bodyMuted]}>{children}</Text>;
+export function Body({
+  children,
+  muted = false,
+  style,
+}: {
+  children: ReactNode;
+  muted?: boolean;
+  style?: StyleProp<any>;
+}) {
+  return <Text style={[styles.body, muted && styles.bodyMuted, style]}>{children}</Text>;
 }
 
 export function Button({
@@ -56,66 +84,111 @@ export function Button({
   variant = 'primary',
   loading = false,
   disabled = false,
+  style,
 }: {
   label: string;
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'danger';
   loading?: boolean;
   disabled?: boolean;
+  style?: StyleProp<ViewStyle>;
 }) {
   const inactive = disabled || loading;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    if (inactive) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Animated.spring(scaleAnim, {
+      toValue: 0.97,
+      useNativeDriver: true,
+      damping: 18,
+      stiffness: 220,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    if (inactive) return;
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      damping: 18,
+      stiffness: 220,
+    }).start();
+  };
+
+  const tier: GlassTier = variant === 'primary' ? 'floating' : 'ambient';
+  const tint: GlassTint = variant === 'primary' ? 'rose' : variant === 'danger' ? 'danger' : 'neutral';
+
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ disabled: inactive, busy: loading }}
-      onPress={onPress}
-      disabled={inactive}
-      style={({ pressed }) => [
-        styles.button,
-        variant === 'primary' && styles.buttonPrimary,
-        variant === 'secondary' && styles.buttonSecondary,
-        variant === 'danger' && styles.buttonDanger,
-        pressed && styles.buttonPressed,
-        inactive && styles.buttonDisabled,
-      ]}
-    >
-      {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? colors.textInverse : colors.text} />
-      ) : (
-        <Text
-          style={[
-            styles.buttonLabel,
-            variant === 'primary' ? styles.buttonLabelDark : styles.buttonLabelLight,
-          ]}
+    <Animated.View style={[{ transform: [{ scale: scaleAnim }] }, style]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ disabled: inactive, busy: loading }}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        disabled={inactive}
+        style={({ pressed }) => [
+          styles.buttonWrapper,
+          inactive && styles.buttonDisabled,
+          pressed && styles.buttonPressed,
+        ]}
+      >
+        <GlassSurface
+          tier={tier}
+          tint={tint}
+          radius={radius.pill}
+          style={styles.buttonGlass}
         >
-          {label}
-        </Text>
-      )}
-    </Pressable>
+          <View style={styles.buttonInner}>
+            {loading ? (
+              <LoadingDots />
+            ) : (
+              <Text
+                style={[
+                  styles.buttonLabel,
+                  variant === 'primary' && styles.buttonLabelPrimary,
+                  variant === 'secondary' && styles.buttonLabelSecondary,
+                  variant === 'danger' && styles.buttonLabelDanger,
+                ]}
+              >
+                {label}
+              </Text>
+            )}
+          </View>
+        </GlassSurface>
+      </Pressable>
+    </Animated.View>
   );
 }
 
 export function Card({
   children,
   style,
+  tier = 'raised',
+  tint = 'neutral',
 }: {
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
+  tier?: GlassTier;
+  tint?: GlassTint;
 }) {
-  return <View style={[styles.card, style]}>{children}</View>;
+  return (
+    <GlassSurface tier={tier} tint={tint} radius={radius.xl} style={style}>
+      <View style={styles.cardInner}>{children}</View>
+    </GlassSurface>
+  );
 }
 
 /**
- * FR-6.2 (DECIDED): "Boosted profiles **must be labeled 'Boosted'** to viewers."
- *
- * This component is the single implementation of that obligation. Rendering a profile whose
- * payload carries `boosted: true` without it is a product-rule violation, not a style choice —
- * which is why the label text is not a prop.
+ * FR-6.2 (DECIDED): "Boosted profiles MUST be labeled 'Boosted' to viewers."
+ * Mandatory product label requirement — rendered in Rose Pill, Tier 1 glass.
  */
 export function BoostedBadge() {
   return (
-    <View style={styles.boostedBadge} accessibilityLabel="This profile has boosted visibility">
-      <Text style={styles.boostedText}>BOOSTED</Text>
+    <View accessibilityLabel="This profile has boosted visibility">
+      <Pill label="BOOSTED" tone="rose" />
     </View>
   );
 }
@@ -123,22 +196,72 @@ export function BoostedBadge() {
 export function Pill({
   label,
   tone = 'neutral',
+  selected = false,
+  onPress,
 }: {
   label: string;
-  tone?: 'neutral' | 'success' | 'warning' | 'danger';
+  tone?: 'neutral' | 'success' | 'warning' | 'danger' | 'rose';
+  selected?: boolean;
+  onPress?: () => void;
 }) {
-  const toneStyle =
-    tone === 'success'
-      ? styles.pillSuccess
+  const tint: GlassTint =
+    selected || tone === 'rose'
+      ? 'rose'
       : tone === 'warning'
-        ? styles.pillWarning
+        ? 'warning'
         : tone === 'danger'
-          ? styles.pillDanger
-          : styles.pillNeutral;
+          ? 'danger'
+          : 'neutral';
+
+  const handlePress = () => {
+    if (onPress) {
+      void Haptics.selectionAsync();
+      onPress();
+    }
+  };
+
+  const pillContent = (
+    <GlassSurface tier="ambient" tint={tint} radius={radius.pill} style={styles.pillGlass}>
+      <View style={[styles.pillInner, selected && styles.pillSelectedInner]}>
+        <Text style={[styles.pillText, selected && styles.pillSelectedText]}>{label}</Text>
+      </View>
+    </GlassSurface>
+  );
+
+  if (onPress) {
+    return (
+      <Pressable onPress={handlePress} accessibilityRole="button">
+        {pillContent}
+      </Pressable>
+    );
+  }
+
+  return pillContent;
+}
+
+/** Small breathing dot typing/loading indicator (21st.dev Message Loading reference) */
+function LoadingDots() {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0, duration: 600, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [anim]);
+
+  const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1.2] });
+  const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
 
   return (
-    <View style={[styles.pill, toneStyle]}>
-      <Text style={styles.pillText}>{label}</Text>
+    <View style={styles.dotsRow}>
+      <Animated.View style={[styles.dot, { transform: [{ scale }], opacity }]} />
+      <Animated.View style={[styles.dot, { transform: [{ scale }], opacity, marginHorizontal: 6 }]} />
+      <Animated.View style={[styles.dot, { transform: [{ scale }], opacity }]} />
     </View>
   );
 }
@@ -146,8 +269,12 @@ export function Pill({
 export function Loading({ label }: { label?: string }) {
   return (
     <View style={styles.centered}>
-      <ActivityIndicator color={colors.primary} size="large" />
-      {label ? <Text style={styles.loadingLabel}>{label}</Text> : null}
+      <GlassSurface tier="floating" tint="rose" radius={radius.pill} style={styles.loadingCapsule}>
+        <View style={styles.loadingContent}>
+          <LoadingDots />
+          {label ? <Text style={styles.loadingLabel}>{label}</Text> : null}
+        </View>
+      </GlassSurface>
     </View>
   );
 }
@@ -163,89 +290,157 @@ export function ErrorState({
 }) {
   return (
     <View style={styles.centered}>
-      <Text style={styles.errorTitle}>{title}</Text>
-      {detail ? <Text style={styles.errorDetail}>{detail}</Text> : null}
-      {onRetry ? (
-        <View style={styles.errorAction}>
-          <Button label="Try again" onPress={onRetry} variant="secondary" />
+      <Card tier="raised" tint="danger" style={styles.errorCard}>
+        <Text style={styles.errorTitle}>{title}</Text>
+        {detail ? <Text style={styles.errorDetail}>{detail}</Text> : null}
+        {onRetry ? (
+          <View style={styles.errorAction}>
+            <Button label="Try again" onPress={onRetry} variant="secondary" />
+          </View>
+        ) : null}
+      </Card>
+    </View>
+  );
+}
+
+/** Clear Tier 1 Glass Input field */
+export function GlassInput({
+  label,
+  error,
+  leftElement,
+  style,
+  ...props
+}: TextInputProps & {
+  label?: string;
+  error?: string;
+  leftElement?: ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <View style={[styles.inputContainer, style]}>
+      {label ? <Text style={styles.inputLabel}>{label}</Text> : null}
+      <GlassSurface tier="ambient" radius={radius.pill}>
+        <View style={styles.inputInner}>
+          {leftElement}
+          <TextInput
+            placeholderTextColor={colors.text.muted}
+            style={styles.textInput}
+            {...props}
+          />
         </View>
-      ) : null}
+      </GlassSurface>
+      {error ? <Text style={styles.inputError}>{error}</Text> : null}
+    </View>
+  );
+}
+
+/** Six-cell glass capsule OTP input */
+export function OtpInput({
+  value,
+  onChange,
+  length = 6,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  length?: number;
+}) {
+  const digits = value.split('');
+
+  return (
+    <View style={styles.otpRow}>
+      {Array.from({ length }).map((_, i) => {
+        const digit = digits[i] || '';
+        const isFilled = digit !== '';
+        return (
+          <GlassSurface
+            key={i}
+            tier="ambient"
+            tint={isFilled ? 'rose' : 'neutral'}
+            radius={radius.pill}
+            style={styles.otpCell}
+          >
+            <View style={styles.otpCellInner}>
+              <Text style={styles.otpText}>{digit}</Text>
+            </View>
+          </GlassSurface>
+        );
+      })}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screenWrapper: { flex: 1, backgroundColor: colors.bg.wine },
+  screen: { flex: 1 },
   screenBody: { flex: 1, padding: spacing.lg },
   scrollContent: { padding: spacing.lg, paddingBottom: spacing.xxl },
 
   headingBlock: { marginBottom: spacing.lg },
-  headingText: { ...typography.title, color: colors.text },
-  headingSub: { ...typography.body, color: colors.textMuted, marginTop: spacing.sm },
+  headingText: { ...typography.displayL, color: colors.text.primary },
+  headingSub: { ...typography.bodyM, color: colors.text.muted, marginTop: spacing.sm },
 
-  body: { ...typography.body, color: colors.text },
-  bodyMuted: { color: colors.textMuted },
+  body: { ...typography.bodyL, color: colors.text.primary },
+  bodyMuted: { color: colors.text.muted },
 
-  button: {
+  buttonWrapper: { minHeight: 52, borderRadius: radius.pill },
+  buttonGlass: { minHeight: 52 },
+  buttonInner: {
     minHeight: 52,
-    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
   },
-  buttonPrimary: { backgroundColor: colors.primary },
-  buttonSecondary: {
-    backgroundColor: colors.surfaceRaised,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  buttonDanger: { backgroundColor: colors.danger },
-  buttonPressed: { opacity: 0.85 },
-  buttonDisabled: { opacity: 0.45 },
-  buttonLabel: { ...typography.bodyStrong },
-  buttonLabelDark: { color: colors.textInverse },
-  buttonLabelLight: { color: colors.text },
+  buttonPressed: { opacity: 0.88 },
+  buttonDisabled: { opacity: 0.35 },
+  buttonLabel: { ...typography.label },
+  buttonLabelPrimary: { color: colors.text.onRose },
+  buttonLabelSecondary: { color: colors.warmBeige },
+  buttonLabelDanger: { color: colors.rose[300] },
 
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-  },
+  cardInner: { padding: spacing.lg },
 
-  boostedBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.boostedBg,
-    borderColor: colors.boosted,
-    borderWidth: 1,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-  },
-  boostedText: { ...typography.label, color: colors.boosted },
-
-  pill: {
-    alignSelf: 'flex-start',
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-  },
-  pillNeutral: { backgroundColor: colors.surfaceRaised },
-  pillSuccess: { backgroundColor: '#1B3A2C' },
-  pillWarning: { backgroundColor: '#3A2E1B' },
-  pillDanger: { backgroundColor: '#3A1E1E' },
-  pillText: { ...typography.caption, color: colors.text },
+  pillGlass: { alignSelf: 'flex-start' },
+  pillInner: { paddingHorizontal: spacing.md, paddingVertical: 6 },
+  pillSelectedInner: { backgroundColor: 'rgba(207, 65, 115, 0.30)' },
+  pillText: { ...typography.caption, color: colors.text.primary },
+  pillSelectedText: { color: colors.text.onRose, fontFamily: 'Manrope_700Bold' },
 
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
-  loadingLabel: { ...typography.body, color: colors.textMuted, marginTop: spacing.md },
+  loadingCapsule: { paddingHorizontal: spacing.xl, paddingVertical: spacing.md },
+  loadingContent: { alignItems: 'center', justifyContent: 'center' },
+  loadingLabel: { ...typography.bodyM, color: colors.text.primary, marginTop: spacing.sm },
 
-  errorTitle: { ...typography.heading, color: colors.text, textAlign: 'center' },
+  dotsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.rose[300] },
+
+  errorCard: { width: '100%', maxWidth: 340, alignItems: 'center' },
+  errorTitle: { ...typography.displayM, color: colors.text.primary, textAlign: 'center' },
   errorDetail: {
-    ...typography.body,
-    color: colors.textMuted,
+    ...typography.bodyM,
+    color: colors.text.muted,
     textAlign: 'center',
     marginTop: spacing.sm,
   },
-  errorAction: { marginTop: spacing.lg },
+  errorAction: { marginTop: spacing.lg, width: '100%' },
+
+  inputContainer: { marginBottom: spacing.md },
+  inputLabel: { ...typography.label, color: colors.text.primary, marginBottom: spacing.xs },
+  inputInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    height: 52,
+  },
+  textInput: {
+    flex: 1,
+    ...typography.bodyL,
+    color: colors.text.primary,
+    paddingVertical: spacing.xs,
+  },
+  inputError: { ...typography.caption, color: colors.dangerRed, marginTop: spacing.xs },
+
+  otpRow: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: spacing.lg },
+  otpCell: { width: 46, height: 56 },
+  otpCellInner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  otpText: { ...typography.displayM, color: colors.text.primary },
 });

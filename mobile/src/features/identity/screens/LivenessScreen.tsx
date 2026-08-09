@@ -2,23 +2,14 @@ import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo
 import * as FileSystem from 'expo-file-system/legacy';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 
 import { ApiError } from '../../../api/client';
-import { Body, Button, Heading, Loading, Screen } from '../../../components';
+import { Body, Button, Card, GlassSurface, Heading, Loading, Screen } from '../../../components';
 import { colors, radius, spacing, typography } from '../../../theme';
 import { identityApi, type LivenessSession } from '../api';
 import { useOnboarding } from '../state';
-
-/**
- * Liveness capture (FR-1.2, §4, §5).
- *
- * §4: "Camera flow issues **server-provided randomized prompts** (blink, head turn); uploads
- * short video to a pre-signed object-storage URL."
- *
- * The randomization is the whole defence and it comes from the server — a client that chose
- * its own prompts could be replayed with a pre-recorded video of someone else performing a
- * known sequence. This screen only *displays* the sequence it was handed.
- */
 
 const PROMPT_COPY: Record<string, string> = {
   blink_twice: 'Blink twice',
@@ -33,9 +24,8 @@ const SECONDS_PER_PROMPT = 3;
 
 export function LivenessScreen() {
   const setStep = useOnboarding((s) => s.setStep);
+  const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
-  // `recordAsync` captures video WITH audio, so it fails outright without the microphone
-  // permission — even though nothing here ever listens to the audio track.
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const camera = useRef<CameraView | null>(null);
 
@@ -52,8 +42,6 @@ export function LivenessScreen() {
       .catch(() => setError('Could not start verification. Please try again.'));
   }, []);
 
-  // Advance the on-screen instruction while recording, so the user performs the sequence in
-  // the order the server issued it.
   useEffect(() => {
     if (!recording || !session) return;
     const timer = setInterval(() => {
@@ -70,6 +58,7 @@ export function LivenessScreen() {
 
   const capture = useCallback(async () => {
     if (!camera.current || !session) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     setError(null);
     setRecording(true);
@@ -84,12 +73,6 @@ export function LivenessScreen() {
 
       setBusy(true);
 
-      // Straight to object storage via the pre-signed URL (§4) — the video never transits
-      // the API, and §18 discards it after the embedding is produced.
-      //
-      // `uploadAsync` rather than fetch+blob: React Native has no real Blob backing a file://
-      // URI, so the body would arrive empty. It also matters more here than for photos, since
-      // a liveness video is far larger and streaming avoids holding it in memory.
       const upload = await FileSystem.uploadAsync(session.upload_url, video.uri, {
         httpMethod: 'PUT',
         uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
@@ -122,32 +105,26 @@ export function LivenessScreen() {
   if (!permission.granted || !micPermission.granted) {
     return (
       <Screen>
-        <Heading sub="Sincère verifies every member with a short video, so nobody is talking to a bot or a stolen photo. It is recorded once and deleted after checking.">
-          Camera access
-        </Heading>
-        <Button
-          label="Allow camera"
-          onPress={() => {
-            void (async () => {
-              // Both, in sequence: video capture needs the microphone even though the audio
-              // is never used, and a partial grant fails at record time with a cryptic error.
-              if (!permission.granted) await requestPermission();
-              if (!micPermission.granted) await requestMicPermission();
-            })();
-          }}
-        />
-        <View style={styles.note}>
-          <Body muted>
-            We keep a mathematical signature of your face, not the video. The signature cannot
-            be turned back into a picture.
-          </Body>
-          <View style={styles.note}>
+        <Card tier="raised" style={styles.permissionCard}>
+          <Heading sub="Sincère verifies every member with a short video, so nobody is talking to a bot or a stolen photo. It is recorded once and deleted after checking.">
+            Camera access
+          </Heading>
+          <Button
+            label="Allow camera & microphone"
+            onPress={() => {
+              void (async () => {
+                if (!permission.granted) await requestPermission();
+                if (!micPermission.granted) await requestMicPermission();
+              })();
+            }}
+          />
+          <View style={styles.noteBlock}>
             <Body muted>
-              Android also asks for the microphone: video recording requires it. Sincère never
-              listens to the audio, and the recording is deleted after checking.
+              We keep a mathematical signature of your face, not the video. The signature cannot
+              be turned back into a picture.
             </Body>
           </View>
-        </View>
+        </Card>
       </Screen>
     );
   }
@@ -168,35 +145,54 @@ export function LivenessScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Full-bleed native camera — NO glass overlay over video itself */}
       <CameraView ref={camera} style={styles.camera} facing="front" mode="video" />
 
-      <View style={styles.overlay}>
-        <View style={styles.promptCard}>
-          <Text style={styles.promptStep}>
-            STEP {promptIndex + 1} OF {session.prompt_sequence.length}
-          </Text>
-          <Text style={styles.promptText}>
-            {PROMPT_COPY[currentPrompt] ?? currentPrompt.replace(/_/g, ' ')}
-          </Text>
-        </View>
+      <View style={[styles.overlay, { paddingTop: Math.max(insets.top, spacing.lg) }]}>
+        {/* Tier 3 Floating Glass Top Prompt Card */}
+        <GlassSurface tier="floating" radius={radius.xl} sheen style={styles.promptCardGlass}>
+          <View style={styles.promptCardInner}>
+            <Text style={styles.promptStep}>
+              STEP {promptIndex + 1} OF {session.prompt_sequence.length}
+            </Text>
+            <Text style={styles.promptText}>
+              {PROMPT_COPY[currentPrompt] ?? currentPrompt.replace(/_/g, ' ')}
+            </Text>
+          </View>
+        </GlassSurface>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? (
+          <GlassSurface tier="ambient" tint="danger" radius={radius.md} style={styles.errorGlass}>
+            <Text style={styles.errorText}>{error}</Text>
+          </GlassSurface>
+        ) : null}
 
-        <View style={styles.controls}>
-          {recording ? (
-            <Pressable onPress={stop} style={[styles.button, styles.stop]}>
-              <Text style={styles.buttonText}>Done</Text>
-            </Pressable>
-          ) : (
-            <Pressable onPress={() => void capture()} style={styles.button}>
-              <Text style={styles.buttonText}>Start</Text>
-            </Pressable>
-          )}
-          <Text style={styles.hint}>
-            {recording
-              ? 'Follow each instruction as it appears.'
-              : 'Hold your phone at eye level in good light.'}
-          </Text>
+        {/* Shutter controls */}
+        <View style={[styles.controls, { paddingBottom: Math.max(insets.bottom, spacing.xl) }]}>
+          {/* Tip banner */}
+          <GlassSurface tier="ambient" radius={radius.pill} style={styles.tipBanner}>
+            <Text style={styles.tipText}>
+              {recording
+                ? 'Follow each instruction as it appears'
+                : 'Hold phone at eye level in good light'}
+            </Text>
+          </GlassSurface>
+
+          {/* Lens Ring Shutter Button */}
+          <Pressable
+            onPress={recording ? stop : () => void capture()}
+            accessibilityRole="button"
+            accessibilityLabel={recording ? 'Stop recording' : 'Start recording'}
+          >
+            <GlassSurface
+              tier="floating"
+              tint={recording ? 'rose' : 'neutral'}
+              radius={44}
+              style={styles.shutterRing}
+            >
+              <View style={[styles.shutterInner, recording && styles.shutterInnerRecording]} />
+            </GlassSurface>
+          </Pressable>
         </View>
       </View>
     </View>
@@ -206,48 +202,31 @@ export function LivenessScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   camera: { ...StyleSheet.absoluteFillObject },
-  overlay: { flex: 1, justifyContent: 'space-between', padding: spacing.lg },
-  promptCard: {
-    marginTop: spacing.xxl,
-    backgroundColor: 'rgba(18,16,26,0.88)',
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    alignItems: 'center',
-  },
-  promptStep: { ...typography.label, color: colors.primary },
+  overlay: { flex: 1, justifyContent: 'space-between', paddingHorizontal: spacing.lg },
+
+  promptCardGlass: { marginTop: spacing.md },
+  promptCardInner: { padding: spacing.lg, alignItems: 'center' },
+  promptStep: { ...typography.label, color: colors.rose[300] },
   promptText: {
-    ...typography.title,
-    color: colors.text,
+    fontFamily: 'Fraunces_500Medium',
+    fontSize: 24,
+    lineHeight: 30,
+    color: colors.warmBeige,
     textAlign: 'center',
     marginTop: spacing.xs,
   },
-  error: {
-    ...typography.caption,
-    color: colors.danger,
-    backgroundColor: 'rgba(18,16,26,0.9)',
-    padding: spacing.sm,
-    borderRadius: radius.sm,
-    textAlign: 'center',
-  },
-  controls: { alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xl },
-  button: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stop: { backgroundColor: colors.danger },
-  buttonText: { ...typography.bodyStrong, color: colors.textInverse },
-  hint: {
-    ...typography.caption,
-    color: colors.text,
-    textAlign: 'center',
-    backgroundColor: 'rgba(18,16,26,0.75)',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radius.sm,
-  },
-  note: { marginTop: spacing.lg },
+
+  errorGlass: { padding: spacing.md, marginVertical: spacing.md },
+  errorText: { ...typography.caption, color: colors.dangerRed, textAlign: 'center' },
+
+  controls: { alignItems: 'center', gap: spacing.md },
+  tipBanner: { paddingHorizontal: spacing.md, paddingVertical: 6 },
+  tipText: { ...typography.caption, color: colors.warmBeige },
+
+  shutterRing: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center' },
+  shutterInner: { width: 68, height: 68, borderRadius: 34, borderWidth: 3, borderColor: colors.warmBeige },
+  shutterInnerRecording: { backgroundColor: colors.rose[500], borderWidth: 0 },
+
+  permissionCard: { marginVertical: 'auto' },
+  noteBlock: { marginTop: spacing.lg },
 });

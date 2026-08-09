@@ -1,44 +1,86 @@
 /**
- * Design tokens.
+ * Liquid Glass Design System Tokens for Sincère.
  *
- * Sincère's positioning is "verified, deliberate, fair" — the palette is deep and calm rather
- * than the saturated pinks the category defaults to. One source of truth so screens never
- * hard-code a colour.
+ * Implements Apple's Liquid Glass material guidelines (iOS 26+ visual language),
+ * incorporating Fraunces serif & Manrope sans-serif typography, wine-to-beige gradients,
+ * translucent glass tiers, and Rose accent glint tokens.
  */
 
 export const colors = {
-  // Base
-  background: '#12101A',
-  surface: '#1C1826',
-  surfaceRaised: '#262034',
-  border: '#332C44',
+  // Base backdrop gradient tokens
+  bg: {
+    wine: '#5D3140',
+    roseDusk: '#8B4A5F',
+    warm: '#F6D8BD',
+  },
 
-  // Text
-  text: '#F5F2FA',
-  textMuted: '#A79FBA',
-  textFaint: '#6F6684',
-  textInverse: '#12101A',
+  // Translucent glass material fills
+  glass: {
+    ambient: {
+      fill: 'rgba(255, 255, 255, 0.06)',
+      border: 'rgba(255, 255, 255, 0.22)',
+      blur: 40,
+    },
+    raised: {
+      fill: 'rgba(255, 255, 255, 0.10)',
+      border: 'rgba(255, 255, 255, 0.22)',
+      blur: 60,
+      shadow: '0px 8px 24px rgba(0, 0, 0, 0.35)',
+    },
+    floating: {
+      fill: 'rgba(255, 255, 255, 0.14)',
+      border: 'rgba(255, 255, 255, 0.25)',
+      blur: 80,
+      shadow: '0px 16px 40px rgba(0, 0, 0, 0.45)',
+    },
+    sheen: 'rgba(255, 255, 255, 0.08)',
+  },
 
-  // Brand
-  primary: '#C9A227',
-  primaryPressed: '#A8871E',
-  primaryMutedBg: '#2A2418',
+  // Rose accent tokens
+  rose: {
+    300: '#F39399',
+    500: '#CF4173',
+    700: '#A23D5F',
+  },
 
-  // Semantic
+  // Warm neutral accent
+  warmBeige: '#F6D8BD',
+
+  // Semantics
+  passSlate: '#A89CB8',
+  warningAmber: '#FFC15E',
+  dangerRed: '#D85A6A',
+  successGreen: '#4BAE7F',
+
+  // Text tokens
+  text: {
+    primary: '#F6D8BD',
+    muted: 'rgba(246, 216, 189, 0.65)',
+    onRose: '#FEFAF6',
+    inverse: '#5D3140',
+  },
+
+  // Legacy mappings for backward-compatibility with existing feature code
+  background: '#5D3140',
+  surface: 'rgba(255, 255, 255, 0.10)',
+  surfaceRaised: 'rgba(255, 255, 255, 0.14)',
+  border: 'rgba(255, 255, 255, 0.22)',
+
+  primary: '#CF4173',
+  primaryPressed: '#A23D5F',
+  primaryMutedBg: 'rgba(207, 65, 115, 0.20)',
+
   success: '#4BAE7F',
-  warning: '#E0A458',
-  danger: '#D9534F',
+  warning: '#FFC15E',
+  danger: '#D85A6A',
   info: '#5B8FD9',
 
-  /** FR-6.2: boosted profiles MUST be visibly labeled. Its own token so it cannot be
-   *  quietly restyled into invisibility. */
-  boosted: '#E0A458',
-  boostedBg: '#2E2418',
+  boosted: '#CF4173',
+  boostedBg: 'rgba(207, 65, 115, 0.15)',
 
-  /** Verification states mirror the §6 lifecycle. */
   verified: '#4BAE7F',
-  pending: '#E0A458',
-  rejected: '#D9534F',
+  pending: '#FFC15E',
+  rejected: '#D85A6A',
 } as const;
 
 export const spacing = {
@@ -54,19 +96,70 @@ export const radius = {
   sm: 8,
   md: 12,
   lg: 20,
-  pill: 999,
+  xl: 24,
+  pill: 9999,
 } as const;
 
 export const typography = {
-  display: { fontSize: 32, fontWeight: '700' as const, letterSpacing: -0.5 },
-  title: { fontSize: 24, fontWeight: '700' as const, letterSpacing: -0.3 },
-  heading: { fontSize: 19, fontWeight: '600' as const },
-  body: { fontSize: 16, fontWeight: '400' as const, lineHeight: 23 },
-  bodyStrong: { fontSize: 16, fontWeight: '600' as const },
-  caption: { fontSize: 13, fontWeight: '400' as const, lineHeight: 18 },
-  label: { fontSize: 12, fontWeight: '600' as const, letterSpacing: 0.6 },
+  displayXL: {
+    fontFamily: 'Fraunces_600SemiBold',
+    fontSize: 40,
+    lineHeight: 44,
+    color: colors.text.primary,
+  },
+  displayL: {
+    fontFamily: 'Fraunces_500Medium',
+    fontSize: 28,
+    lineHeight: 34,
+    color: colors.text.primary,
+  },
+  displayM: {
+    fontFamily: 'Fraunces_500Medium',
+    fontSize: 22,
+    lineHeight: 28,
+    color: colors.text.primary,
+  },
+  bodyL: {
+    fontFamily: 'Manrope_400Regular',
+    fontSize: 17,
+    lineHeight: 24,
+    color: colors.text.primary,
+  },
+  bodyM: {
+    fontFamily: 'Manrope_400Regular',
+    fontSize: 15,
+    lineHeight: 21,
+    color: colors.text.primary,
+  },
+  label: {
+    fontFamily: 'Manrope_600SemiBold',
+    fontSize: 13,
+    lineHeight: 16,
+    letterSpacing: 0.4,
+    color: colors.text.primary,
+  },
+  caption: {
+    fontFamily: 'Manrope_500Medium',
+    fontSize: 12,
+    lineHeight: 16,
+    color: colors.text.muted,
+  },
+
+  // Legacy mappings for fallback
+  display: { fontFamily: 'Fraunces_600SemiBold', fontSize: 32, lineHeight: 38 },
+  title: { fontFamily: 'Fraunces_500Medium', fontSize: 24, lineHeight: 30 },
+  heading: { fontFamily: 'Fraunces_500Medium', fontSize: 19, lineHeight: 25 },
+  body: { fontFamily: 'Manrope_400Regular', fontSize: 16, lineHeight: 23 },
+  bodyStrong: { fontFamily: 'Manrope_600SemiBold', fontSize: 16, lineHeight: 23 },
 } as const;
 
-export const theme = { colors, spacing, radius, typography } as const;
+export const motion = {
+  buttonPress: { damping: 18, stiffness: 220, mass: 0.9 },
+  cardEntrance: { damping: 20, stiffness: 160 },
+  swipeRelease: { damping: 14, stiffness: 120 },
+  tagToggle: { damping: 16, stiffness: 200 },
+} as const;
+
+export const theme = { colors, spacing, radius, typography, motion } as const;
 
 export type Theme = typeof theme;

@@ -3,26 +3,13 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { useCallback, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 import { ApiError } from '../../../api/client';
-import { Body, Button, Card, Heading, Screen } from '../../../components';
+import { Body, Button, Card, GlassInput, GlassSurface, Heading, Pill, Screen } from '../../../components';
 import { colors, radius, spacing, typography } from '../../../theme';
 import { identityApi } from '../api';
 import { useOnboarding } from '../state';
-
-/**
- * Profile builder — prompts, tags, photos (§4 screen map, FR-1.1).
- *
- * Comes **before** the liveness capture, which the §4 diagram draws the other way round. §5's
- * sequence diagram has it in this order ("profile data, photos" then "request liveness
- * session"), and FR-1.5 settles it: the photo-to-selfie match needs photos to already exist
- * when the selfie is taken.
- *
- * Validation is shown, never silent. An earlier version disabled the continue button until
- * every requirement was met and said nothing about which one was missing — the user was left
- * tapping a dead control. Requirements are now listed with live tick marks, and the button
- * stays tappable so pressing it can explain what is outstanding.
- */
 
 const PROMPT_QUESTIONS = [
   'A perfect Sunday',
@@ -40,7 +27,6 @@ const TAG_OPTIONS = [
 
 const MIN_TAGS = 3;
 
-/** Insert the dashes as the user types, so the format can't be got wrong. */
 function formatDob(input: string): string {
   const digits = input.replace(/\D/g, '').slice(0, 8);
   if (digits.length <= 4) return digits;
@@ -78,7 +64,6 @@ export function ProfileBuilderScreen() {
 
   const age = ageFrom(dob);
 
-  /** Each requirement, with the reason it exists, so the UI can explain itself. */
   const requirements = useMemo(
     () => [
       { label: 'Your name', met: name.trim().length > 0 },
@@ -102,15 +87,12 @@ export function ProfileBuilderScreen() {
 
   const missing = requirements.filter((r) => !r.met);
 
-  const toggleTag = (tag: string) =>
+  const toggleTag = (tag: string) => {
     setTags((current) =>
       current.includes(tag) ? current.filter((t) => t !== tag) : [...current, tag],
     );
+  };
 
-  /**
-   * Upload straight to object storage through a pre-signed URL (§4).
-   * The bytes never transit the API — a §19 performance choice and a §18 minimization one.
-   */
   const addPhoto = useCallback(async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -131,10 +113,6 @@ export function ProfileBuilderScreen() {
     setError(null);
     try {
       const target = await identityApi.photoUploadUrl('image/jpeg');
-
-      // `fetch(fileUri).blob()` is unreliable in React Native — Hermes has no real Blob
-      // backing a file:// URI, so the body arrives empty or the call throws outright.
-      // `uploadAsync` streams the file from disk, which is what it exists for.
       const result = await FileSystem.uploadAsync(target.upload_url, asset.uri, {
         httpMethod: 'PUT',
         uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
@@ -147,8 +125,6 @@ export function ProfileBuilderScreen() {
         {
           uri: asset.uri,
           object_key: target.object_key,
-          // Store what the server will serve, not the local file:// path — that URI is
-          // meaningless to anyone else looking at the profile.
           public_url: target.public_url ?? asset.uri,
         },
       ]);
@@ -159,10 +135,11 @@ export function ProfileBuilderScreen() {
     }
   }, []);
 
-  const removePhoto = (objectKey: string) =>
+  const removePhoto = (objectKey: string) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setPhotos((current) => current.filter((p) => p.object_key !== objectKey));
+  };
 
-  /** §4/FR-3.3: location captured once, no background permission requested. */
   const captureLocation = useCallback(async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') return false;
@@ -214,25 +191,26 @@ export function ProfileBuilderScreen() {
         Build your profile
       </Heading>
 
-      <Field label="YOUR NAME">
-        <TextInput
-          value={name}
-          onChangeText={setName}
-          placeholder="Aditi"
-          placeholderTextColor={colors.textFaint}
-          style={styles.input}
-        />
-      </Field>
+      <GlassInput
+        label="YOUR NAME"
+        value={name}
+        onChangeText={setName}
+        placeholder="Aditi"
+      />
 
-      <Field label="DATE OF BIRTH">
-        <TextInput
+      <View style={styles.dobBlock}>
+        <View style={styles.dobHeader}>
+          <Text style={styles.label}>DATE OF BIRTH</Text>
+          {age !== null && age >= 18 && (
+            <Pill label={`Age ${age}`} tone="rose" />
+          )}
+        </View>
+        <GlassInput
           value={dob}
           onChangeText={(text) => setDob(formatDob(text))}
           placeholder="1996-04-12"
-          placeholderTextColor={colors.textFaint}
           keyboardType="number-pad"
           maxLength={10}
-          style={styles.input}
         />
         <Text style={styles.hint}>
           {age === null
@@ -241,92 +219,120 @@ export function ProfileBuilderScreen() {
               ? 'You must be 18 or older to use Sincère.'
               : `You are ${age}. This is shown on your profile.`}
         </Text>
-      </Field>
+      </View>
 
-      <Field label="ABOUT YOU (OPTIONAL)">
-        <TextInput
-          value={bio}
-          onChangeText={setBio}
-          placeholder="Long walks, short deadlines."
-          placeholderTextColor={colors.textFaint}
-          multiline
-          maxLength={500}
-          style={[styles.input, styles.multiline]}
-        />
-      </Field>
+      <View style={styles.sectionBlock}>
+        <Text style={styles.label}>ABOUT YOU (OPTIONAL)</Text>
+        <GlassSurface tier="ambient" radius={radius.lg}>
+          <View style={styles.multilineInner}>
+            <TextInput
+              value={bio}
+              onChangeText={setBio}
+              placeholder="Long walks, short deadlines."
+              placeholderTextColor={colors.text.muted}
+              multiline
+              maxLength={500}
+              style={styles.multilineInput}
+            />
+            <Text style={styles.charCount}>{bio.length}/500</Text>
+          </View>
+        </GlassSurface>
+      </View>
 
-      <Field label="A PROMPT (OPTIONAL)">
-        <Text style={styles.question}>{PROMPT_QUESTIONS[promptIndex]}</Text>
-        <TextInput
-          value={promptAnswer}
-          onChangeText={setPromptAnswer}
-          placeholder="A bookshop and no plans."
-          placeholderTextColor={colors.textFaint}
-          multiline
-          maxLength={400}
-          style={[styles.input, styles.multiline]}
-        />
-        <Pressable
-          onPress={() => setPromptIndex((i) => (i + 1) % PROMPT_QUESTIONS.length)}
-          accessibilityRole="button"
-        >
-          <Text style={styles.link}>Try a different question</Text>
-        </Pressable>
-      </Field>
+      <View style={styles.sectionBlock}>
+        <Text style={styles.label}>A PROMPT (OPTIONAL)</Text>
+        <Card tier="raised">
+          <Text style={styles.question}>{PROMPT_QUESTIONS[promptIndex]}</Text>
+          <GlassSurface tier="ambient" radius={radius.md} style={styles.promptInputGlass}>
+            <TextInput
+              value={promptAnswer}
+              onChangeText={setPromptAnswer}
+              placeholder="A bookshop and no plans."
+              placeholderTextColor={colors.text.muted}
+              multiline
+              maxLength={400}
+              style={styles.promptInput}
+            />
+          </GlassSurface>
+          <Pressable
+            onPress={() => {
+              void Haptics.selectionAsync();
+              setPromptIndex((i) => (i + 1) % PROMPT_QUESTIONS.length);
+            }}
+            accessibilityRole="button"
+            style={styles.promptChangeLink}
+          >
+            <Text style={styles.link}>Change prompt question</Text>
+          </Pressable>
+        </Card>
+      </View>
 
-      <Field label={`INTERESTS — PICK AT LEAST ${MIN_TAGS}`}>
-        <View style={styles.tags}>
+      <View style={styles.sectionBlock}>
+        <Text style={styles.label}>INTERESTS — PICK AT LEAST {MIN_TAGS}</Text>
+        <View style={styles.tagsGrid}>
           {TAG_OPTIONS.map((tag) => {
-            const on = tags.includes(tag);
+            const selected = tags.includes(tag);
             return (
-              <Pressable
+              <Pill
                 key={tag}
+                label={tag}
+                selected={selected}
                 onPress={() => toggleTag(tag)}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: on }}
-                style={[styles.tag, on && styles.tagOn]}
-              >
-                <Text style={[styles.tagText, on && styles.tagTextOn]}>{tag}</Text>
-              </Pressable>
+              />
             );
           })}
         </View>
-      </Field>
+      </View>
 
-      <Field label="PHOTOS">
-        <View style={styles.photos}>
+      <View style={styles.sectionBlock}>
+        <Text style={styles.label}>PHOTOS</Text>
+        <View style={styles.photosGrid}>
           {photos.map((photo) => (
-            <Pressable
+            <GlassSurface
               key={photo.object_key}
-              onPress={() => removePhoto(photo.object_key)}
-              accessibilityLabel="Remove photo"
+              tier="raised"
+              radius={radius.md}
+              style={styles.photoFrame}
             >
-              <Image source={{ uri: photo.uri }} style={styles.photo} />
-              <View style={styles.removeBadge}>
-                <Text style={styles.removeText}>×</Text>
-              </View>
-            </Pressable>
+              <Image source={{ uri: photo.uri }} style={styles.photoImage} />
+              <Pressable
+                onPress={() => removePhoto(photo.object_key)}
+                accessibilityLabel="Remove photo"
+                style={styles.removeBadge}
+              >
+                <GlassSurface tier="floating" tint="danger" radius={radius.pill} style={styles.removeBadgeGlass}>
+                  <Text style={styles.removeText}>×</Text>
+                </GlassSurface>
+              </Pressable>
+            </GlassSurface>
           ))}
           {photos.length < 6 ? (
-            <Pressable
-              onPress={() => void addPhoto()}
-              style={styles.addPhoto}
-              accessibilityLabel="Add a photo"
-            >
-              <Text style={styles.addPhotoText}>+</Text>
+            <Pressable onPress={() => void addPhoto()} accessibilityLabel="Add a photo">
+              <GlassSurface tier="ambient" radius={radius.md} style={styles.addPhotoTile}>
+                <Text style={styles.addPhotoPlus}>+</Text>
+              </GlassSurface>
             </Pressable>
           ) : null}
         </View>
-        <Body muted>
+        <Body muted style={styles.photoNotice}>
           Your photos are checked against your verification selfie, so they have to be you.
         </Body>
-      </Field>
+      </View>
 
-      <Card style={styles.checklist}>
+      <Card tier="raised" style={styles.checklist}>
         <Text style={styles.label}>BEFORE YOU CONTINUE</Text>
         {requirements.map((req) => (
-          <View key={req.label} style={styles.requirement}>
-            <Text style={[styles.check, req.met && styles.checkMet]}>{req.met ? '✓' : '○'}</Text>
+          <View key={req.label} style={styles.requirementRow}>
+            <GlassSurface
+              tier="ambient"
+              tint={req.met ? 'rose' : 'neutral'}
+              radius={radius.pill}
+              style={styles.checkBadge}
+            >
+              <Text style={[styles.checkText, req.met && styles.checkTextMet]}>
+                {req.met ? '✓' : '○'}
+              </Text>
+            </GlassSurface>
             <Text style={[styles.requirementText, req.met && styles.requirementMet]}>
               {req.label}
             </Text>
@@ -340,84 +346,56 @@ export function ProfileBuilderScreen() {
         <Button
           label={
             missing.length > 0
-              ? `${missing.length} thing${missing.length === 1 ? '' : 's'} left`
+              ? `${missing.length} requirement${missing.length === 1 ? '' : 's'} remaining`
               : 'Continue to verification'
           }
           onPress={() => void submit()}
           loading={busy}
+          disabled={missing.length > 0}
         />
       </View>
     </Screen>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <Card style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-      {children}
-    </Card>
-  );
-}
-
 const styles = StyleSheet.create({
-  field: { marginBottom: spacing.sm, gap: spacing.xs },
-  label: { ...typography.label, color: colors.textFaint },
-  question: { ...typography.bodyStrong, color: colors.text },
-  input: {
-    minHeight: 48,
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radius.sm,
-    color: colors.text,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    ...typography.body,
-  },
-  multiline: { minHeight: 88, textAlignVertical: 'top' },
-  hint: { ...typography.caption, color: colors.textMuted },
-  link: { ...typography.caption, color: colors.primary, marginTop: spacing.xs },
-  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  tag: {
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-  },
-  tagOn: { backgroundColor: colors.primary, borderColor: colors.primary },
-  tagText: { ...typography.caption, color: colors.textMuted },
-  tagTextOn: { color: colors.textInverse, fontWeight: '600' },
-  photos: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  photo: { width: 76, height: 95, borderRadius: radius.sm },
-  removeBadge: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: colors.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  removeText: { color: colors.text, fontSize: 15, fontWeight: '700', lineHeight: 18 },
-  addPhoto: {
-    width: 76,
-    height: 95,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addPhotoText: { ...typography.title, color: colors.textFaint },
-  checklist: { marginTop: spacing.sm, gap: spacing.xs },
-  requirement: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  check: { ...typography.body, color: colors.textFaint, width: 18 },
-  checkMet: { color: colors.success },
-  requirementText: { ...typography.caption, color: colors.textMuted, flex: 1 },
-  requirementMet: { color: colors.text },
-  error: { ...typography.caption, color: colors.danger, marginTop: spacing.sm },
-  action: { marginTop: spacing.md, marginBottom: spacing.xl },
+  dobBlock: { marginBottom: spacing.md },
+  dobHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs },
+  sectionBlock: { marginBottom: spacing.lg },
+  label: { ...typography.label, color: colors.text.muted, marginBottom: spacing.xs },
+
+  hint: { ...typography.caption, color: colors.text.muted, marginTop: spacing.xs },
+
+  multilineInner: { padding: spacing.md, minHeight: 90 },
+  multilineInput: { flex: 1, ...typography.bodyL, color: colors.text.primary, textAlignVertical: 'top' },
+  charCount: { ...typography.caption, color: colors.text.muted, alignSelf: 'flex-end', marginTop: spacing.xs },
+
+  question: { ...typography.displayM, color: colors.warmBeige, marginBottom: spacing.sm },
+  promptInputGlass: { marginVertical: spacing.xs },
+  promptInput: { padding: spacing.md, minHeight: 70, ...typography.bodyL, color: colors.text.primary, textAlignVertical: 'top' },
+  promptChangeLink: { marginTop: spacing.sm },
+  link: { ...typography.caption, color: colors.rose[300], textDecorationLine: 'underline' },
+
+  tagsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
+
+  photosGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.xs },
+  photoFrame: { width: 84, height: 105, overflow: 'hidden', position: 'relative' },
+  photoImage: { width: '100%', height: '100%' },
+  removeBadge: { position: 'absolute', top: 4, right: 4 },
+  removeBadgeGlass: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  removeText: { color: colors.text.onRose, fontSize: 16, fontFamily: 'Manrope_700Bold', lineHeight: 18 },
+  addPhotoTile: { width: 84, height: 105, alignItems: 'center', justifyContent: 'center', borderStyle: 'dashed' },
+  addPhotoPlus: { fontFamily: 'Fraunces_500Medium', fontSize: 32, color: colors.rose[300] },
+  photoNotice: { marginTop: spacing.xs },
+
+  checklist: { marginTop: spacing.sm, gap: spacing.sm },
+  requirementRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  checkBadge: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  checkText: { ...typography.caption, color: colors.text.muted },
+  checkTextMet: { color: colors.text.onRose, fontFamily: 'Manrope_700Bold' },
+  requirementText: { ...typography.caption, color: colors.text.muted, flex: 1 },
+  requirementMet: { color: colors.warmBeige, fontFamily: 'Manrope_600SemiBold' },
+
+  error: { ...typography.caption, color: colors.dangerRed, marginTop: spacing.sm },
+  action: { marginTop: spacing.lg, marginBottom: spacing.xxl },
 });

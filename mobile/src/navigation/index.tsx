@@ -1,15 +1,14 @@
 import { NavigationContainer, type Theme as NavTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useEffect } from 'react';
-import { View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Loading } from '../components';
+import { GlassSurface, Loading, Logo } from '../components';
 import { useSession } from '../state/session';
-import { colors, typography } from '../theme';
+import { colors, radius, spacing, typography } from '../theme';
 
-// Feature entry points. Cross-feature imports go through these index files only, mirroring
-// the backend's §3 rule that a module exposes exactly one public surface.
 import { OnboardingFlow, RejectedScreen, VerifyingScreen } from '../features/identity';
 import { WaitlistScreen } from '../features/admission';
 import { HomeScreen, MatchesScreen } from '../features/matching';
@@ -17,19 +16,6 @@ import { ChatScreen } from '../features/chat';
 import { MeScreen } from '../features/monetization';
 import { WeMetPrompt } from '../features/feedback_ml';
 import { WarningInterstitial } from '../features/antiabuse';
-
-/**
- * Root navigator — a direct rendering of the §6 lifecycle state machine.
- *
- * The navigator switches on the token's `scope` claim rather than pushing screens, so a user
- * in one lifecycle state has **no mounted route** into another state's screens. §5 enforces
- * the same rule server-side ("a waitlisted man's token cannot call matching/chat endpoints");
- * this makes the client structurally agree instead of merely hiding buttons.
- *
- * That is why nothing in the waitlist flow navigates to Home. The user gets there by being
- * *admitted*: the server re-issues a token with `scope: active`, the session store updates,
- * and this switch re-renders into a different tree.
- */
 
 export type RootStackParamList = {
   Waitlist: undefined;
@@ -43,37 +29,81 @@ const Tabs = createBottomTabNavigator();
 const navTheme: NavTheme = {
   dark: true,
   colors: {
-    primary: colors.primary,
-    background: colors.background,
-    card: colors.surface,
-    text: colors.text,
-    border: colors.border,
-    notification: colors.danger,
+    primary: colors.rose[500],
+    background: colors.bg.wine,
+    card: colors.glass.raised.fill,
+    text: colors.text.primary,
+    border: colors.glass.ambient.border,
+    notification: colors.dangerRed,
   },
   fonts: {
-    regular: { fontFamily: 'System', fontWeight: '400' },
-    medium: { fontFamily: 'System', fontWeight: '500' },
-    bold: { fontFamily: 'System', fontWeight: '700' },
-    heavy: { fontFamily: 'System', fontWeight: '800' },
+    regular: { fontFamily: 'Manrope_400Regular', fontWeight: '400' },
+    medium: { fontFamily: 'Manrope_500Medium', fontWeight: '500' },
+    bold: { fontFamily: 'Manrope_700Bold', fontWeight: '700' },
+    heavy: { fontFamily: 'Fraunces_600SemiBold', fontWeight: '800' },
   },
 };
 
-const screenOptions = {
-  headerStyle: { backgroundColor: colors.background },
-  headerTitleStyle: { ...typography.heading, color: colors.text },
-  headerTintColor: colors.text,
-  contentStyle: { backgroundColor: colors.background },
-} as const;
+/** Floating Liquid Glass Tab Bar */
+function CustomFloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const insets = useSafeAreaInsets();
 
-/** The active-user surface. Mounted only for `scope: active`. */
+  return (
+    <View style={[styles.tabBarContainer, { bottom: Math.max(insets.bottom, spacing.md) }]}>
+      <GlassSurface tier="floating" radius={radius.pill} sheen style={styles.tabBarGlass}>
+        <View style={styles.tabBarInner}>
+          {state.routes.map((route, index) => {
+            const { options } = descriptors[route.key];
+            const label = options.title ?? route.name;
+            const isFocused = state.index === index;
+
+            const onPress = () => {
+              const event = navigation.emit({
+                type: 'tabPress',
+                target: route.key,
+                canPreventDefault: true,
+              });
+
+              if (!isFocused && !event.defaultPrevented) {
+                navigation.navigate(route.name);
+              }
+            };
+
+            return (
+              <Pressable
+                key={route.key}
+                onPress={onPress}
+                style={styles.tabItem}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isFocused }}
+              >
+                {/* Active Tab Glow */}
+                {isFocused && <View style={styles.activeGlow} />}
+                <Text
+                  style={[
+                    styles.tabLabel,
+                    isFocused ? styles.tabLabelActive : styles.tabLabelInactive,
+                  ]}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </GlassSurface>
+    </View>
+  );
+}
+
+/** Active user surface with floating glass tab bar. */
 function MainTabs() {
   return (
     <Tabs.Navigator
+      tabBar={(props) => <CustomFloatingTabBar {...props} />}
       screenOptions={{
-        ...screenOptions,
-        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textFaint,
+        headerShown: false,
+        sceneStyle: { backgroundColor: colors.bg.wine },
       }}
     >
       <Tabs.Screen name="Today" component={HomeScreen} options={{ title: 'Today' }} />
@@ -83,13 +113,6 @@ function MainTabs() {
   );
 }
 
-/**
- * Modals that can interrupt any active-user screen.
- *
- * Both render `null` until the server says there is something to show, so they cost nothing
- * when idle. They live above the navigator because §4 requires the warning interstitial to be
- * unmissable — a screen-level placement could be navigated away from.
- */
 function ActiveOverlays() {
   return (
     <>
@@ -110,9 +133,6 @@ export function RootNavigator() {
     return <Loading label="Sincère" />;
   }
 
-  // Signed out, or mid-onboarding: the linear signup sequence, outside the navigator.
-  // §5 gives onboarding tokens a scope that unlocks only verification routes, so there is
-  // nothing else to navigate to.
   if (status === 'signed_out' || scope === 'onboarding') {
     return <OnboardingFlow />;
   }
@@ -123,14 +143,27 @@ export function RootNavigator() {
 
   return (
     <NavigationContainer theme={navTheme}>
-      <Stack.Navigator screenOptions={screenOptions}>
+      <Stack.Navigator
+        screenOptions={{
+          headerStyle: { backgroundColor: colors.bg.wine },
+          headerTitleStyle: { ...typography.displayM, color: colors.text.primary },
+          headerTintColor: colors.text.primary,
+          contentStyle: { backgroundColor: colors.bg.wine },
+        }}
+      >
         {scope === 'waitlisted' ? (
-          // FR-2.6: the waitlist is a one-way door — never evicted back here, and no route
-          // out of it except admission. Matching and chat are simply not in this tree.
           <Stack.Screen
             name="Waitlist"
             component={WaitlistScreen}
-            options={{ title: 'Your place in line' }}
+            options={{
+              title: 'Your place in line',
+              headerTitle: () => (
+                <View style={styles.headerTitleRow}>
+                  <Logo size={32} />
+                  <Text style={styles.headerTitleText}>Your place in line</Text>
+                </View>
+              ),
+            }}
           />
         ) : scope === 'active' ? (
           <>
@@ -158,3 +191,56 @@ export function RootNavigator() {
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBarContainer: {
+    position: 'absolute',
+    left: spacing.lg,
+    right: spacing.lg,
+    alignItems: 'center',
+  },
+  tabBarGlass: {
+    width: '100%',
+    maxWidth: 360,
+  },
+  tabBarInner: {
+    flexDirection: 'row',
+    height: 58,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingHorizontal: spacing.sm,
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    position: 'relative',
+  },
+  activeGlow: {
+    position: 'absolute',
+    width: 48,
+    height: 32,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(207, 65, 115, 0.25)',
+  },
+  tabLabel: {
+    ...typography.label,
+  },
+  tabLabelActive: {
+    color: colors.warmBeige,
+    fontFamily: 'Manrope_700Bold',
+  },
+  tabLabelInactive: {
+    color: 'rgba(246, 216, 189, 0.55)',
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  headerTitleText: {
+    ...typography.displayM,
+    color: colors.text.primary,
+  },
+});

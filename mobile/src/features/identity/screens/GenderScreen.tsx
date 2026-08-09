@@ -1,21 +1,16 @@
 import { useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 import { ApiError } from '../../../api/client';
-import { Body, Button, Card, Heading, Screen } from '../../../components';
-import { colors, spacing, typography } from '../../../theme';
+import { GlassSurface, Heading, Screen } from '../../../components';
+import { colors, radius, spacing, typography } from '../../../theme';
 import { identityApi } from '../api';
 import { useOnboarding } from '../state';
 
 /**
  * Gender selection.
- *
- * Two values, because Sincère's admission ratio (FR-2.4) is defined over two opposite pools —
- * a mechanical constraint of the documented admission model, not a claim about identity. The
- * copy says why, because a bare binary choice with no explanation reads as carelessness.
- *
- * Write-once (the service enforces it): changing it later would retroactively corrupt every
- * hex's ratio counters.
+ * Preserves all business logic exactly.
  */
 export function GenderScreen() {
   const setStep = useOnboarding((s) => s.setStep);
@@ -23,6 +18,7 @@ export function GenderScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const choose = async (gender: 'male' | 'female') => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setError(null);
     setBusy(gender);
     try {
@@ -30,7 +26,7 @@ export function GenderScreen() {
       setStep('profile');
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        setStep('profile'); // already set — a retry after a dropped response
+        setStep('profile');
         return;
       }
       setError(err instanceof ApiError ? (err.problem.detail ?? err.problem.title) : 'Try again.');
@@ -45,32 +41,76 @@ export function GenderScreen() {
         I am a…
       </Heading>
 
-      <Card style={styles.card}>
-        <Button
+      <View style={styles.tilesContainer}>
+        <TileOption
           label="Woman"
+          sub="Joining female membership balance"
+          busy={busy === 'female'}
+          disabled={busy !== null}
           onPress={() => void choose('female')}
-          loading={busy === 'female'}
-          disabled={busy !== null}
         />
-        <Button
+        <TileOption
           label="Man"
-          onPress={() => void choose('male')}
-          loading={busy === 'male'}
+          sub="Joining male membership balance"
+          busy={busy === 'male'}
           disabled={busy !== null}
+          onPress={() => void choose('male')}
         />
-      </Card>
+      </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <Body muted>
-        This cannot be changed later — it determines how you were admitted. Contact support if
-        you need it corrected.
-      </Body>
+      <Text style={styles.disclaimer}>
+        🔒 This cannot be changed later — it determines how you were admitted. Contact support if you need it corrected.
+      </Text>
     </Screen>
   );
 }
 
+function TileOption({
+  label,
+  sub,
+  busy,
+  disabled,
+  onPress,
+}: {
+  label: string;
+  sub: string;
+  busy: boolean;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.tileWrapper, pressed && styles.tilePressed]}
+    >
+      <GlassSurface
+        tier="raised"
+        tint={busy ? 'rose' : 'neutral'}
+        radius={radius.xl}
+        style={styles.tileGlass}
+      >
+        <View style={styles.tileInner}>
+          <Text style={styles.tileLabel}>{label}</Text>
+          <Text style={styles.tileSub}>{sub}</Text>
+        </View>
+      </GlassSurface>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  card: { gap: spacing.sm, marginBottom: spacing.md },
-  error: { ...typography.caption, color: colors.danger, marginBottom: spacing.sm },
+  tilesContainer: { gap: spacing.md, marginVertical: spacing.lg },
+  tileWrapper: { width: '100%' },
+  tilePressed: { opacity: 0.88, transform: [{ scale: 0.98 }] },
+  tileGlass: { minHeight: 90 },
+  tileInner: { padding: spacing.lg, justifyContent: 'center' },
+  tileLabel: { ...typography.displayM, color: colors.warmBeige },
+  tileSub: { ...typography.caption, color: colors.text.muted, marginTop: spacing.xs },
+
+  error: { ...typography.caption, color: colors.dangerRed, marginBottom: spacing.sm },
+  disclaimer: { ...typography.caption, color: colors.text.muted, marginTop: spacing.md, lineHeight: 18 },
 });

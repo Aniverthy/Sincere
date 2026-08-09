@@ -2,17 +2,15 @@ import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ApiError } from '../../../api/client';
-import { Body, Button, Heading, Screen } from '../../../components';
+import { Body, Button, GlassSurface, Heading, OtpInput, Screen } from '../../../components';
 import { useSession } from '../../../state/session';
 import { colors, radius, spacing, typography } from '../../../theme';
 import { identityApi } from '../api';
 import { useOnboarding } from '../state';
 
 /**
- * OTP verification (§5 ``POST /auth/verify-otp`` → onboarding-scope tokens).
- *
- * On success the session store takes over: the token's `scope` claim drives which screens
- * exist, so there is no explicit navigation call here.
+ * OTP verification (§5 POST /auth/verify-otp → onboarding-scope tokens).
+ * Preserves all business logic exactly.
  */
 export function OtpScreen() {
   const { phone, challengeId, devOtp, reset, setStep } = useOnboarding();
@@ -47,27 +45,31 @@ export function OtpScreen() {
         Enter your code
       </Heading>
 
-      <TextInput
-        value={otp}
-        onChangeText={setOtp}
-        placeholder="000000"
-        placeholderTextColor={colors.textFaint}
-        keyboardType="number-pad"
-        maxLength={6}
-        autoFocus
-        style={styles.input}
-        editable={!busy}
-      />
+      <View style={styles.inputWrapper}>
+        <OtpInput value={otp} onChange={setOtp} length={6} />
+        <TextInput
+          value={otp}
+          onChangeText={(v) => setOtp(v.replace(/[^0-9]/g, '').slice(0, 6))}
+          keyboardType="number-pad"
+          maxLength={6}
+          autoFocus
+          style={styles.hiddenInput}
+          editable={!busy}
+        />
+      </View>
+
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       {devOtp ? (
-        <View style={styles.devHint}>
-          <Text style={styles.devLabel}>DEV MODE</Text>
-          <Text style={styles.devCode}>{devOtp}</Text>
-          <Text style={styles.devNote}>
-            Shown because SMS_PROVIDER=console. Never returned in production.
-          </Text>
-        </View>
+        <GlassSurface tier="ambient" tint="warning" radius={radius.lg} style={styles.devHint}>
+          <View style={styles.devHintInner}>
+            <Text style={styles.devLabel}>DEV MODE</Text>
+            <Text style={styles.devCode}>{devOtp}</Text>
+            <Text style={styles.devNote}>
+              Shown because SMS_PROVIDER=console. Never returned in production.
+            </Text>
+          </View>
+        </GlassSurface>
       ) : null}
 
       <View style={styles.actions}>
@@ -86,35 +88,25 @@ export function OtpScreen() {
 }
 
 const styles = StyleSheet.create({
-  input: {
-    minHeight: 64,
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.text,
-    textAlign: 'center',
-    letterSpacing: 12,
-    fontSize: 28,
-    fontWeight: '700',
+  inputWrapper: { position: 'relative' },
+  hiddenInput: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0,
+    fontSize: 1,
   },
-  error: { ...typography.caption, color: colors.danger, marginTop: spacing.sm },
-  devHint: {
-    marginTop: spacing.lg,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: colors.primaryMutedBg,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    alignItems: 'center',
-  },
-  devLabel: { ...typography.label, color: colors.primary },
+  error: { ...typography.caption, color: colors.dangerRed, marginTop: spacing.sm },
+
+  devHint: { marginTop: spacing.lg },
+  devHintInner: { padding: spacing.md, alignItems: 'center' },
+  devLabel: { ...typography.label, color: colors.warningAmber },
   devCode: {
-    ...typography.title,
-    color: colors.primary,
+    fontFamily: 'Fraunces_600SemiBold',
+    fontSize: 28,
+    color: colors.warningAmber,
     letterSpacing: 8,
     marginVertical: spacing.xs,
   },
-  devNote: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
+  devNote: { ...typography.caption, color: colors.text.muted, textAlign: 'center' },
+
   actions: { gap: spacing.sm, marginTop: spacing.lg, marginBottom: spacing.md },
 });

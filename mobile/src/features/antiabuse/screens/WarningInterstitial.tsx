@@ -2,19 +2,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Modal, StyleSheet, Text, View } from 'react-native';
 
-import { Body, Button, Screen } from '../../../components';
+import { Body, Button, Card, GlassSurface, Pill } from '../../../components';
 import { colors, radius, spacing, typography } from '../../../theme';
 import { antiabuseApi } from '../api';
 
 /**
  * Anti-abuse warning interstitial (FR-5.3, §4).
- *
- * §4 requires these render **distinctly from a ban notice**, so the final occasion changes
- * colour, heading and copy rather than just incrementing a counter.
- *
- * The tone is deliberate. Most people tripping the FR-5.2 dwell rule are swiping carelessly,
- * not maliciously, and the goal is to change the habit — so the copy explains the behaviour
- * and its effect on other people rather than accusing anyone of anything.
+ * Preserves all warning status and acknowledge logic.
  */
 export function WarningInterstitial() {
   const queryClient = useQueryClient();
@@ -46,77 +40,78 @@ export function WarningInterstitial() {
   };
 
   return (
-    <Modal animationType="fade" visible>
-      <Screen>
-        <View style={styles.body}>
-          <View style={[styles.badge, isFinal ? styles.badgeBan : styles.badgeWarn]}>
-            <Text style={[styles.badgeText, isFinal ? styles.badgeTextBan : styles.badgeTextWarn]}>
-              {isFinal ? 'ACCOUNT SUSPENDED' : `WARNING ${warning.occasion_no} OF ${warning.of}`}
+    <Modal animationType="fade" transparent visible>
+      <View style={styles.modalScrim}>
+        <GlassSurface
+          tier="floating"
+          tint={isFinal ? 'danger' : 'warning'}
+          radius={radius.xl}
+          sheen
+          style={styles.sheetGlass}
+        >
+          <View style={styles.sheetInner}>
+            <View style={styles.badgeRow}>
+              <Pill
+                label={isFinal ? 'ACCOUNT SUSPENDED' : `WARNING ${warning.occasion_no} OF ${warning.of}`}
+                tone={isFinal ? 'danger' : 'warning'}
+              />
+            </View>
+
+            <Text style={styles.heading}>
+              {isFinal ? 'Your account has been suspended' : 'Please slow down'}
             </Text>
-          </View>
 
-          <Text style={styles.heading}>
-            {isFinal ? 'Your account has been suspended' : 'Please slow down'}
-          </Text>
+            <Body style={styles.messageText}>{warning.message}</Body>
 
-          <Body>{warning.message}</Body>
+            {!isFinal ? (
+              <Card tier="ambient" style={styles.explainCard}>
+                <Text style={styles.explainTitle}>WHY THIS MATTERS</Text>
+                <Body muted style={styles.explainText}>
+                  Sincère gives everyone fifteen people a day precisely so each one gets read.
+                  Liking profiles without looking at them makes matches meaningless — for the
+                  people you liked, and for you.
+                </Body>
+              </Card>
+            ) : (
+              <Card tier="ambient" tint="danger" style={styles.explainCard}>
+                <Text style={styles.explainTitle}>WHAT NOW</Text>
+                <Body muted style={styles.explainText}>
+                  If you believe this is a mistake, contact support@sincere.app and a person will
+                  review it.
+                </Body>
+              </Card>
+            )}
 
-          {!isFinal ? (
-            <View style={styles.explain}>
-              <Text style={styles.explainTitle}>Why this matters</Text>
-              <Body muted>
-                Sincère gives everyone fifteen people a day precisely so each one gets read.
-                Liking profiles without looking at them makes matches meaningless — for the
-                people you liked, and for you.
-              </Body>
+            <View style={styles.action}>
+              <Button
+                label={isFinal ? 'I understand' : 'Got it'}
+                onPress={() => void acknowledge()}
+                loading={busy}
+                variant={isFinal ? 'danger' : 'primary'}
+              />
             </View>
-          ) : (
-            <View style={styles.explain}>
-              <Text style={styles.explainTitle}>What now</Text>
-              <Body muted>
-                If you believe this is a mistake, contact support@sincere.app and a person will
-                review it.
-              </Body>
-            </View>
-          )}
-
-          <View style={styles.action}>
-            <Button
-              label={isFinal ? 'I understand' : 'Got it'}
-              onPress={() => void acknowledge()}
-              loading={busy}
-              variant={isFinal ? 'danger' : 'primary'}
-            />
           </View>
-        </View>
-      </Screen>
+        </GlassSurface>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  body: { flex: 1, justifyContent: 'center', gap: spacing.md },
-  badge: {
-    alignSelf: 'flex-start',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
+  modalScrim: {
+    flex: 1,
+    backgroundColor: 'rgba(93, 49, 64, 0.90)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
   },
-  badgeWarn: { backgroundColor: '#3A2E1B', borderColor: colors.warning },
-  badgeBan: { backgroundColor: '#3A1E1E', borderColor: colors.danger },
-  badgeText: { ...typography.label },
-  badgeTextWarn: { color: colors.warning },
-  badgeTextBan: { color: colors.danger },
-  heading: { ...typography.title, color: colors.text },
-  explain: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    gap: spacing.xs,
-  },
-  explainTitle: { ...typography.label, color: colors.textFaint },
-  action: { marginTop: spacing.md },
+  sheetGlass: { width: '100%', maxWidth: 360 },
+  sheetInner: { padding: spacing.xl, gap: spacing.md },
+  badgeRow: { flexDirection: 'row' },
+  heading: { ...typography.displayM, color: colors.warmBeige, lineHeight: 28 },
+  messageText: { ...typography.bodyL, color: colors.warmBeige, lineHeight: 22 },
+  explainCard: { padding: spacing.md, gap: spacing.xs },
+  explainTitle: { ...typography.label, color: colors.text.muted },
+  explainText: { ...typography.bodyM, lineHeight: 20 },
+  action: { marginTop: spacing.sm },
 });

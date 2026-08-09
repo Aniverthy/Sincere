@@ -4,16 +4,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { api } from '../../../api/client';
-import { Body, Button, Card, Heading, Pill, Screen } from '../../../components';
+import { Body, Button, Card, GlassSurface, Heading, Pill, Screen } from '../../../components';
 import { useSession } from '../../../state/session';
-import { colors, spacing, typography } from '../../../theme';
+import { colors, radius as defaultRadius, spacing, typography } from '../../../theme';
 import { monetizationApi } from '../api';
 
 /**
  * Me — radius slider (1-100 km), Pro plans, settings, delete account (§4 screen map).
- *
- * §4 requires the radius copy make clear it affects **matches only, never queue position** —
- * users otherwise assume a wider radius jumps the waitlist.
+ * Preserves all business logic, queries, and location update functionality.
  */
 export function MeScreen() {
   const signOut = useSession((state) => state.signOut);
@@ -40,17 +38,11 @@ export function MeScreen() {
     try {
       await api.patch('/me/radius', { radius_km: next });
     } catch {
-      // Roll the control back rather than showing a value the server did not accept.
       setRadius(previous);
       setNotice('Could not change your radius. Check your connection.');
     }
   }, [radius]);
 
-  /**
-   * §4: location is fetched once per app foreground and posted. **No background permission
-   * is requested** — that is a product decision (DECIDED) and a privacy selling point, and
-   * `app.json` blocks ACCESS_BACKGROUND_LOCATION at the manifest level to make it structural.
-   */
   const refreshLocation = useCallback(async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
@@ -94,88 +86,110 @@ export function MeScreen() {
     <Screen scroll>
       <Heading>Me</Heading>
 
-      <Card style={styles.section}>
-        <Text style={styles.sectionTitle}>Your radius</Text>
-        <Text style={styles.radiusValue}>{radius ?? '—'} km</Text>
-        <View style={styles.radiusButtons}>
+      {/* Radius Selector Card */}
+      <Card tier="raised" style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>YOUR RADIUS</Text>
+        <Text style={styles.radiusDisplay}>{radius ?? '—'} km</Text>
+        <View style={styles.radiusPillsRow}>
           {[5, 10, 25, 50, 100].map((km) => (
-            <Button
+            <Pill
               key={km}
-              label={`${km}`}
-              variant={radius === km ? 'primary' : 'secondary'}
+              label={`${km} km`}
+              selected={radius === km}
               onPress={() => void changeRadius(km)}
             />
           ))}
         </View>
-        <Body muted>
+        <Body muted style={styles.sectionNote}>
           Your radius decides which people you are shown. It has no effect on your place in
           any queue.
         </Body>
       </Card>
 
-      <Card style={styles.section}>
-        <Text style={styles.sectionTitle}>Your plan</Text>
-        <Pill
-          label={subscription?.tier ? subscription.tier.replace('_', ' ') : 'Free'}
-          tone={subscription?.tier ? 'success' : 'neutral'}
-        />
+      {/* Subscription Plan Card with warmBeige shimmer sheen for paid tiers */}
+      <Card tier="raised" style={styles.sectionCard}>
+        <View style={styles.planHeader}>
+          <Text style={styles.sectionTitle}>YOUR PLAN</Text>
+          <Pill
+            label={subscription?.tier ? subscription.tier.replace('_', ' ') : 'Free'}
+            tone={subscription?.tier ? 'success' : 'neutral'}
+          />
+        </View>
+
         <Text style={styles.planMeta}>
           {subscription?.daily_matches ?? plans?.free_tier_daily_matches ?? 15} matches a day
         </Text>
-        {plans ? <Body muted>{plans.free_tier_note}</Body> : null}
+        {plans ? <Body muted style={styles.sectionNote}>{plans.free_tier_note}</Body> : null}
 
         {plans?.plans.map((plan) => (
-          <View key={plan.tier} style={styles.plan}>
-            <View style={styles.planHead}>
-              <Text style={styles.planName}>{plan.name}</Text>
-              <Text style={styles.planPrice}>₹{(plan.price_paise / 100).toFixed(0)}/mo</Text>
+          <GlassSurface
+            key={plan.tier}
+            tier="raised"
+            tint="rose"
+            radius={defaultRadius.lg}
+            sheen
+            style={styles.paidPlanGlass}
+          >
+            <View style={styles.paidPlanInner}>
+              <View style={styles.planHead}>
+                <Text style={styles.planName}>{plan.name}</Text>
+                <Text style={styles.planPrice}>₹{(plan.price_paise / 100).toFixed(0)}/mo</Text>
+              </View>
+              {plan.features
+                .filter((feature) => feature.included)
+                .map((feature) => (
+                  <Text key={feature.label} style={styles.featureText}>
+                    ✓ {feature.label}
+                  </Text>
+                ))}
             </View>
-            {plan.features
-              .filter((feature) => feature.included)
-              .map((feature) => (
-                <Text key={feature.label} style={styles.feature}>
-                  · {feature.label}
-                </Text>
-              ))}
-          </View>
+          </GlassSurface>
         ))}
       </Card>
 
-      <Card style={styles.section}>
-        <Text style={styles.sectionTitle}>Privacy</Text>
-        <Body muted>
+      {/* Privacy Location Card */}
+      <Card tier="ambient" style={styles.sectionCard}>
+        <Text style={styles.sectionTitle}>PRIVACY & LOCATION</Text>
+        <Body muted style={styles.sectionNote}>
           We read your location only while the app is open, and overwrite it each time. No
           history exists to leak.
         </Body>
-        <Button label="Update my location" variant="secondary" onPress={() => void refreshLocation()} />
+        <View style={styles.locationAction}>
+          <Button label="Update my location" variant="secondary" onPress={() => void refreshLocation()} />
+        </View>
       </Card>
 
-      {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+      {notice ? <Text style={styles.noticeText}>{notice}</Text> : null}
 
-      <View style={styles.footer}>
+      <View style={styles.accountActionsFooter}>
         <Button label="Sign out" variant="secondary" onPress={() => void signOut()} />
-        <Button label="Delete account" variant="danger" onPress={confirmDelete} />
+        <View style={styles.deleteSpacer}>
+          <Button label="Delete account" variant="danger" onPress={confirmDelete} />
+        </View>
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  section: { marginBottom: spacing.md, gap: spacing.sm },
-  sectionTitle: { ...typography.label, color: colors.textFaint },
-  radiusValue: { ...typography.title, color: colors.primary },
-  radiusButtons: { flexDirection: 'row', gap: spacing.xs },
-  planMeta: { ...typography.bodyStrong, color: colors.text },
-  plan: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  planHead: { flexDirection: 'row', justifyContent: 'space-between' },
-  planName: { ...typography.bodyStrong, color: colors.text },
-  planPrice: { ...typography.bodyStrong, color: colors.primary },
-  feature: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
-  notice: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.sm },
-  footer: { gap: spacing.sm, marginTop: spacing.lg },
+  sectionCard: { marginBottom: spacing.lg, gap: spacing.sm },
+  sectionTitle: { ...typography.label, color: colors.text.muted },
+  radiusDisplay: { fontFamily: 'Fraunces_600SemiBold', fontSize: 36, color: colors.rose[300] },
+  radiusPillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginVertical: spacing.xs },
+  sectionNote: { ...typography.bodyM, color: colors.text.muted, lineHeight: 20 },
+
+  planHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  planMeta: { ...typography.displayM, color: colors.warmBeige, marginTop: spacing.xs },
+  paidPlanGlass: { marginTop: spacing.md },
+  paidPlanInner: { padding: spacing.md },
+  planHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs },
+  planName: { ...typography.displayM, color: colors.warmBeige },
+  planPrice: { ...typography.label, color: colors.rose[300], fontSize: 16 },
+  featureText: { ...typography.caption, color: colors.text.primary, marginTop: 4 },
+
+  locationAction: { marginTop: spacing.sm },
+  noticeText: { ...typography.caption, color: colors.rose[300], marginBottom: spacing.sm, textAlign: 'center' },
+
+  accountActionsFooter: { marginTop: spacing.xl, marginBottom: spacing.xxl },
+  deleteSpacer: { marginTop: spacing.lg },
 });

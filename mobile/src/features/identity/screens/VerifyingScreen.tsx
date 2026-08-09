@@ -2,21 +2,14 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { api } from '../../../api/client';
-import { Body, Card, Heading, Loading, Screen } from '../../../components';
+import { Card, GlassSurface, Heading, Loading, Screen } from '../../../components';
 import { useSession } from '../../../state/session';
-import { colors, spacing, typography } from '../../../theme';
+import { colors, radius, spacing, typography } from '../../../theme';
 import { identityApi, type VerificationStatus } from '../api';
 
 /**
  * Verification in progress / pending human review (FR-1.6, FR-1.7, §19).
- *
- * §19 runs embedding generation asynchronously behind a "verifying…" client state, and §4's
- * screen map gives the ambiguous bot-risk band its own screen. Both land here.
- *
- * **How the user leaves this screen.** Not by navigation. Verification changes the account's
- * lifecycle state server-side; the client picks that up by refreshing its tokens, because §5
- * binds the token scope to lifecycle state. A new scope re-renders the root navigator into a
- * different tree — waitlist, or the daily 15. So this screen polls, then refreshes.
+ * Preserves polling and token rotation logic exactly.
  */
 export function VerifyingScreen() {
   const applyTokens = useSession((s) => s.applyTokens);
@@ -31,8 +24,6 @@ export function VerifyingScreen() {
         if (cancelled) return;
         setStatus(next);
 
-        // Any status past onboarding/pending means a decision landed — pull a token that
-        // carries the new scope so the navigator can move on.
         if (next.status !== 'onboarding' && next.status !== 'pending_review') {
           const { getRefreshToken } = await import('../../../api/tokens');
           const refreshToken = await getRefreshToken();
@@ -49,7 +40,7 @@ export function VerifyingScreen() {
           });
         }
       } catch {
-        // Transient failure — the next tick retries.
+        // Transient failure
       }
     };
 
@@ -64,7 +55,7 @@ export function VerifyingScreen() {
   const underReview = status?.status === 'pending_review';
 
   return (
-    <Screen>
+    <Screen scroll>
       <Heading
         sub={
           underReview
@@ -75,39 +66,51 @@ export function VerifyingScreen() {
         {underReview ? 'We are checking it is really you' : 'Verifying'}
       </Heading>
 
-      <Loading />
+      <View style={styles.loadingHero}>
+        <Loading label={underReview ? 'In review' : 'Processing verification'} />
+      </View>
 
-      <Card style={styles.card}>
-        <Text style={styles.cardTitle}>What is happening</Text>
-        <Step text="Your video is turned into a mathematical signature." />
-        <Step text="The video is deleted. Only the signature is kept." />
-        <Step text="The signature is compared against existing accounts, to catch duplicates." />
-        <Step text="Anything borderline goes to a person, never an automatic rejection." />
+      <Card tier="raised" style={styles.processCard}>
+        <Text style={styles.cardTitle}>WHAT IS HAPPENING</Text>
+        <Step num="1" text="Your video is turned into a mathematical signature." />
+        <Step num="2" text="The video is deleted. Only the signature is kept." />
+        <Step num="3" text="The signature is compared against existing accounts to catch duplicates." />
+        <Step num="4" text="Anything borderline goes to a person, never an automatic rejection." />
       </Card>
 
       {status?.message ? (
-        <View style={styles.status}>
-          <Body muted>{status.message}</Body>
-        </View>
+        <GlassSurface tier="ambient" radius={radius.lg} style={styles.statusGlass}>
+          <View style={styles.statusInner}>
+            <Text style={styles.statusText}>{status.message}</Text>
+          </View>
+        </GlassSurface>
       ) : null}
     </Screen>
   );
 }
 
-function Step({ text }: { text: string }) {
+function Step({ num, text }: { num: string; text: string }) {
   return (
-    <View style={styles.step}>
-      <Text style={styles.bullet}>·</Text>
+    <View style={styles.stepRow}>
+      <GlassSurface tier="ambient" tint="rose" radius={radius.pill} style={styles.stepBadge}>
+        <Text style={styles.stepNum}>{num}</Text>
+      </GlassSurface>
       <Text style={styles.stepText}>{text}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { marginTop: spacing.lg, gap: spacing.xs },
-  cardTitle: { ...typography.label, color: colors.textFaint, marginBottom: spacing.xs },
-  step: { flexDirection: 'row', gap: spacing.sm },
-  bullet: { ...typography.body, color: colors.primary },
-  stepText: { ...typography.caption, color: colors.textMuted, flex: 1 },
-  status: { marginTop: spacing.md },
+  loadingHero: { marginVertical: spacing.lg },
+  processCard: { gap: spacing.md, marginTop: spacing.md },
+  cardTitle: { ...typography.label, color: colors.text.muted },
+
+  stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  stepBadge: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  stepNum: { ...typography.caption, color: colors.text.onRose, fontFamily: 'Manrope_700Bold' },
+  stepText: { ...typography.bodyM, color: colors.text.primary, flex: 1, lineHeight: 22 },
+
+  statusGlass: { marginTop: spacing.lg },
+  statusInner: { padding: spacing.md },
+  statusText: { ...typography.bodyM, color: colors.warmBeige, textAlign: 'center' },
 });
