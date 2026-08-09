@@ -1,0 +1,192 @@
+[project]
+name = "sincere"
+version = "0.1.0"
+description = "Sincère — verified-identity, ratio-balanced dating platform (modular monolith)"
+requires-python = ">=3.11"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["sincere*"]
+
+# ---------------------------------------------------------------------------
+# Lint / format
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ASYNC",
+    "BLE",   # blind `except Exception` — every one must be justified with a noqa
+    "T20",   # stray print()/pprint() — §22 requires structured logging
+    "SLF",   # private-member access across objects
+    "DTZ",   # naive datetimes; every timestamp in §8 is timezone-aware
+]
+ignore = [
+    "B008",    # FastAPI Depends() in defaults is the framework idiom
+    "N818",    # ProblemException is named for RFC-7807, not the Error-suffix convention
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+# ---------------------------------------------------------------------------
+# Types
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["deepface.*", "implicit.*", "xgboost.*", "h3.*", "motor.*", "mongomock_motor.*"]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------
+# Tests (§24)
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+markers = [
+    "integration: requires a live Atlas cluster and Redis",
+    "simulation: synthetic multi-hex population runs (slow)",
+]
+
+# ---------------------------------------------------------------------------
+# Module boundary enforcement — TECHNICAL_IMPLEMENTATION_PLAN.md §3 and §23:807
+#
+# The rule (§3): a module may import another module's `api` and nothing deeper.
+# Cross-module *reactions* go through domain events, never direct calls (§14).
+# This is the load-bearing guarantee for the microservice extraction (§9 of the
+# architecture plan), so it is enforced by tooling rather than by convention.
+#
+# Run: lint-imports
+# ---------------------------------------------------------------------------
+[tool.importlinter]
+root_package = "sincere"
+
+[[tool.importlinter.contracts]]
+name = "shared/ contains no business logic — it must not import any domain module"
+type = "forbidden"
+source_modules = ["sincere.shared"]
+forbidden_modules = [
+    "sincere.identity",
+    "sincere.admission",
+    "sincere.matching",
+    "sincere.chat",
+    "sincere.antiabuse",
+    "sincere.monetization",
+    "sincere.feedback_ml",
+    "sincere.admin",
+]
+
+[[tool.importlinter.contracts]]
+name = "identity internals are private — other modules may only import sincere.identity.api"
+allow_indirect_imports = true
+type = "forbidden"
+source_modules = [
+    "sincere.admission", "sincere.matching", "sincere.chat", "sincere.antiabuse",
+    "sincere.monetization", "sincere.feedback_ml", "sincere.admin",
+]
+forbidden_modules = [
+    "sincere.identity.service", "sincere.identity.repository", "sincere.identity.events",
+    "sincere.identity.routes", "sincere.identity.jobs", "sincere.identity.schemas",
+]
+
+[[tool.importlinter.contracts]]
+name = "admission internals are private — other modules may only import sincere.admission.api"
+allow_indirect_imports = true
+type = "forbidden"
+source_modules = [
+    "sincere.identity", "sincere.matching", "sincere.chat", "sincere.antiabuse",
+    "sincere.monetization", "sincere.feedback_ml", "sincere.admin",
+]
+forbidden_modules = [
+    "sincere.admission.service", "sincere.admission.repository", "sincere.admission.events",
+    "sincere.admission.routes", "sincere.admission.jobs", "sincere.admission.schemas",
+]
+
+[[tool.importlinter.contracts]]
+name = "matching internals are private — other modules may only import sincere.matching.api"
+allow_indirect_imports = true
+type = "forbidden"
+source_modules = [
+    "sincere.identity", "sincere.admission", "sincere.chat", "sincere.antiabuse",
+    "sincere.monetization", "sincere.feedback_ml", "sincere.admin",
+]
+forbidden_modules = [
+    "sincere.matching.service", "sincere.matching.repository", "sincere.matching.events",
+    "sincere.matching.routes", "sincere.matching.jobs", "sincere.matching.schemas",
+]
+
+[[tool.importlinter.contracts]]
+name = "chat internals are private — other modules may only import sincere.chat.api"
+allow_indirect_imports = true
+type = "forbidden"
+source_modules = [
+    "sincere.identity", "sincere.admission", "sincere.matching", "sincere.antiabuse",
+    "sincere.monetization", "sincere.feedback_ml", "sincere.admin",
+]
+forbidden_modules = [
+    "sincere.chat.service", "sincere.chat.repository", "sincere.chat.events",
+    "sincere.chat.routes", "sincere.chat.jobs", "sincere.chat.schemas",
+]
+
+[[tool.importlinter.contracts]]
+name = "antiabuse internals are private — other modules may only import sincere.antiabuse.api"
+allow_indirect_imports = true
+type = "forbidden"
+source_modules = [
+    "sincere.identity", "sincere.admission", "sincere.matching", "sincere.chat",
+    "sincere.monetization", "sincere.feedback_ml", "sincere.admin",
+]
+forbidden_modules = [
+    "sincere.antiabuse.service", "sincere.antiabuse.repository", "sincere.antiabuse.events",
+    "sincere.antiabuse.routes", "sincere.antiabuse.jobs", "sincere.antiabuse.schemas",
+]
+
+[[tool.importlinter.contracts]]
+name = "monetization internals are private — other modules may only import sincere.monetization.api"
+allow_indirect_imports = true
+type = "forbidden"
+source_modules = [
+    "sincere.identity", "sincere.admission", "sincere.matching", "sincere.chat",
+    "sincere.antiabuse", "sincere.feedback_ml", "sincere.admin",
+]
+forbidden_modules = [
+    "sincere.monetization.service", "sincere.monetization.repository",
+    "sincere.monetization.events", "sincere.monetization.routes",
+    "sincere.monetization.jobs", "sincere.monetization.schemas",
+]
+
+[[tool.importlinter.contracts]]
+name = "feedback_ml internals are private — other modules may only import sincere.feedback_ml.api"
+allow_indirect_imports = true
+type = "forbidden"
+source_modules = [
+    "sincere.identity", "sincere.admission", "sincere.matching", "sincere.chat",
+    "sincere.antiabuse", "sincere.monetization", "sincere.admin",
+]
+forbidden_modules = [
+    "sincere.feedback_ml.service", "sincere.feedback_ml.repository",
+    "sincere.feedback_ml.events", "sincere.feedback_ml.routes",
+    "sincere.feedback_ml.jobs", "sincere.feedback_ml.schemas",
+]
+
+[[tool.importlinter.contracts]]
+name = "admin is a consumer — no module may import admin at all"
+allow_indirect_imports = true
+type = "forbidden"
+source_modules = [
+    "sincere.identity", "sincere.admission", "sincere.matching", "sincere.chat",
+    "sincere.antiabuse", "sincere.monetization", "sincere.feedback_ml",
+]
+forbidden_modules = ["sincere.admin"]

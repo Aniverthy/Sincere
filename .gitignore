@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 venv/
 .env
+.env.local
 *.egg-info/
 .pytest_cache/
 .mypy_cache/
@@ -11,14 +12,21 @@ venv/
 htmlcov/
 .coverage
 
+# Local object storage (LocalBackend fallback when OBJECT_STORAGE_BUCKET is unset).
+# Holds real profile photos and liveness captures — §18 treats these as biometric source
+# material that must never leave the machine, let alone reach a repository.
+.storage/
+
 # ML artifacts
 ml/registry/*.bin
 ml/registry/*.pkl
+ml/registry/*.json
 
 # Editor/OS
 .DS_Store
 .idea/
 .vscode/
+Thumbs.db
 
 # Node (website branch leftovers in local working tree)
 node_modules/

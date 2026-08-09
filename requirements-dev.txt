@@ -1,0 +1,15 @@
+# Sincère — development & test dependencies (TECHNICAL_IMPLEMENTATION_PLAN.md §24).
+-r requirements.txt
+
+pytest==8.3.4
+pytest-asyncio==0.25.0
+pytest-cov==6.0.0
+hypothesis==6.123.2             # property-based tests (§24: ratio invariants)
+mongomock-motor==0.0.34
+fakeredis==2.26.2
+httpx==0.28.1
+freezegun==1.5.1                # retention-date computation tests
+
+ruff==0.8.4
+mypy==1.14.0
+import-linter==2.1              # module-boundary enforcement (§23:807)

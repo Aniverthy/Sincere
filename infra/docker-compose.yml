@@ -1,0 +1,49 @@
+# Local development infrastructure.
+#
+# MongoDB runs as a single-node REPLICA SET, not a standalone. Two reasons from the docs:
+#   - §8 change-driven work and the outbox (§14) rely on transactional guarantees that
+#     standalone mongod does not provide.
+#   - Atlas is a replica set, so matching it locally avoids "works on my machine" drift.
+#
+# NOTE: Atlas Vector Search ($vectorSearch, §9 / FR-1.4) does NOT exist in the community
+# server. Duplicate detection therefore requires a real Atlas M10+ cluster — set MONGODB_URI
+# to that cluster. This compose file covers every other collection and index.
+#
+# Start:  docker compose -f infra/docker-compose.yml up -d
+# Stop:   docker compose -f infra/docker-compose.yml down
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: sincere-mongo
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: >
+        mongosh --quiet --eval
+        "try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]}).ok }"
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: sincere-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  mongo-data:
+  redis-data:

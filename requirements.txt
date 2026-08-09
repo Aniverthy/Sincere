@@ -1,13 +1,51 @@
-# Placeholder - pin versions when development starts.
-# Core (assumed stack, see README.md section 4):
-# fastapi
-# uvicorn[standard]
-# motor              # async MongoDB driver
-# celery[redis]
-# redis
-# pydantic-settings
-# pyjwt
-# h3                 # Uber H3 spatial index (resolution 6)
-# deepface           # FaceNet wrapper for embeddings
-# xgboost | lightgbm # reciprocity model
-# implicit           # ALS collaborative filtering
+# Sincère backend — core runtime dependencies.
+# Stack per TECHNICAL_IMPLEMENTATION_PLAN.md:5 (Python 3.11 + FastAPI, Celery + Redis).
+#
+# ML/biometric dependencies live in requirements-ml.txt. They are a separate install
+# because TECHNICAL_IMPLEMENTATION_PLAN.md §9 makes the face pipeline legally gated
+# (BIOMETRIC_PIPELINE_ENABLED) and TensorFlow is a ~1GB dependency with a narrower
+# Python-version support matrix than the rest of the stack.
+
+# --- Web framework ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+websockets==14.1
+
+# --- Config & validation ---
+pydantic==2.10.4
+pydantic-settings==2.7.0
+email-validator==2.2.0
+
+# --- Data stores ---
+motor==3.6.0                    # async MongoDB driver (Atlas)
+pymongo==4.9.2
+redis==5.2.1
+
+# --- Jobs (§15b) ---
+celery[redis]==5.4.0
+
+# --- Auth (§5) ---
+pyjwt[crypto]==2.10.1
+argon2-cffi==23.1.0             # phone-hash + refresh-token hashing
+
+# --- Geospatial (FR-2.1) ---
+h3==4.2.1                       # Uber H3 spatial index, resolution 6
+
+# --- Object storage (§4 pre-signed uploads) ---
+boto3==1.35.92
+
+# --- Numerics (§12 ranking formulas) ---
+numpy==2.2.1
+
+# --- Observability (§21, §22) ---
+structlog==24.4.0
+opentelemetry-api==1.29.0
+opentelemetry-sdk==1.29.0
+opentelemetry-instrumentation-fastapi==0.50b0
+prometheus-client==0.21.1
+sentry-sdk==2.19.2
+
+# --- Utilities ---
+httpx==0.28.1
+python-dateutil==2.9.0.post0

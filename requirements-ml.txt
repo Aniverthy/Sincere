@@ -1,0 +1,29 @@
+# Sincère — ML & biometric dependencies (TECHNICAL_IMPLEMENTATION_PLAN.md §9, §13).
+#
+# Installed separately from requirements.txt for two reasons stated in the docs:
+#   1. §9:484 — the face pipeline is blocked on combined legal review. It ships behind
+#      BIOMETRIC_PIPELINE_ENABLED (default off), so the API must run without these installed.
+#   2. §3 — DeepFace/TensorFlow is heavy and may move to a GPU-backed internal endpoint
+#      "if CPU inference proves too slow — measure first".
+#
+# Install:  pip install -r requirements-ml.txt
+# Requires Python 3.11 (TensorFlow's supported range; the core API runs on 3.11-3.13).
+
+# --- Face embeddings: FaceNet via DeepFace (FR-1.3, DECIDED) ---
+deepface==0.0.93
+tensorflow==2.18.0
+opencv-python-headless==4.10.0.84
+
+# --- Reciprocity prediction: gradient-boosted trees (§13, DECIDED) ---
+xgboost==2.1.3
+scikit-learn==1.6.0
+
+# --- Collaborative filtering: matrix factorization / ALS (§13, DECIDED) ---
+implicit==0.7.2
+scipy==1.15.0
+
+# --- Prompt-text embeddings (prompt_text_similarity, §12) ---
+sentence-transformers==3.3.1
+
+# --- Training pipeline support ---
+pandas==2.2.3
